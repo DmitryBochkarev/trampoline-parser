@@ -1,0 +1,3 @@
+[workspace]
+members = ["trampoline-parser", "trampoline-parser-tests"]
+resolver = "2"
