@@ -3119,7 +3119,9 @@ impl<'a> CodeGenerator<'a> {
         self.line("let postfix_op = &pratt.postfix_ops[op_idx as usize];");
         self.line("if self.try_consume(postfix_op.sep_lit) {");
         self.indent += 1;
-        // Handle trailing comma: after consuming separator, check for close delimiter
+        // Handle trailing comma: after consuming separator, skip whitespace then check for close delimiter
+        self.line("let ws_checkpoint = self.pos; let ws_checkpoint_line = self.line; let ws_checkpoint_column = self.column;");
+        self.line("while self.current_char().map_or(false, |c| c.is_ascii_whitespace()) { self.advance(); }");
         self.line("if self.try_consume(postfix_op.close_lit) {");
         self.indent += 1;
         self.line("while self.current_char().map_or(false, |c| c.is_ascii_whitespace()) { self.advance(); }");
@@ -3127,6 +3129,8 @@ impl<'a> CodeGenerator<'a> {
         self.indent -= 1;
         self.line("} else {");
         self.indent += 1;
+        // Restore position so the argument rule can consume whitespace
+        self.line("self.pos = ws_checkpoint; self.line = ws_checkpoint_line; self.column = ws_checkpoint_column;");
         self.line("self.work_stack.push(Work::PrattPostfixCallSep { pratt_id, result_base, min_prec, op_idx, args_base, start_pos, start_line, start_column });");
         self.line("if let Some(arg_rule) = postfix_op.arg_rule {");
         self.indent += 1;
