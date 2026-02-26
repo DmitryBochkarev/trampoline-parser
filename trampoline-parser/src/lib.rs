@@ -33,11 +33,11 @@ mod validation;
 pub use codegen::*;
 pub use ir::*;
 pub use parser_dsl::*;
-pub use proc_macro2::TokenStream;
 pub use prefix_factoring::{
-    identify_memoization_candidates, BacktrackingSeverity, BacktrackingWarning,
+    BacktrackingSeverity, BacktrackingWarning, identify_memoization_candidates,
 };
-pub use validation::{validate_grammar, ValidationError};
+pub use proc_macro2::TokenStream;
+pub use validation::{ValidationError, validate_grammar};
 
 /// Builder for AST configuration
 #[derive(Debug, Default)]

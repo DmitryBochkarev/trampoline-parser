@@ -14,8 +14,18 @@ pub fn grammar() -> CompiledGrammar {
         .rule("expr", |r| {
             r.pratt(r.parse("unary"), |ops| {
                 // Only infix operators in Pratt - prefix handled in grammar
-                ops.infix_kw("and", 2, Assoc::Left, quote!(|l, r, _| Ok(binary("and", l, r))))
-                    .infix_kw("or", 1, Assoc::Left, quote!(|l, r, _| Ok(binary("or", l, r))))
+                ops.infix_kw(
+                    "and",
+                    2,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(binary("and", l, r))),
+                )
+                .infix_kw(
+                    "or",
+                    1,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(binary("or", l, r))),
+                )
             })
         })
         // Unary handles prefix 'not' with proper ws handling
@@ -25,13 +35,16 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("unary_inner"),
                 r.skip(r.zero_or_more(r.ws())),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(1)) } else { Ok(r) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(mut items) = r {
+                    Ok(items.remove(1))
+                } else {
+                    Ok(r)
+                }
+            }))
         })
         .rule("unary_inner", |r| {
-            r.choice((
-                r.parse("prefix_not"),
-                r.parse("atom"),
-            ))
+            r.choice((r.parse("prefix_not"), r.parse("atom")))
         })
         .rule("prefix_not", |r| {
             r.sequence((
@@ -39,7 +52,14 @@ pub fn grammar() -> CompiledGrammar {
                 r.not_followed_by(r.ident_cont()),
                 r.parse("unary"),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let e = items.into_iter().last().unwrap_or(ParseResult::None); Ok(unary("not", e)) } else { Ok(r) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    let e = items.into_iter().last().unwrap_or(ParseResult::None);
+                    Ok(unary("not", e))
+                } else {
+                    Ok(r)
+                }
+            }))
         })
         .rule("atom", |r| {
             r.choice((r.lit("true"), r.lit("false"), r.parse("ident")))

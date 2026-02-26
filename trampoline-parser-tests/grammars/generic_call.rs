@@ -29,14 +29,30 @@ pub fn bad_grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("expr", |r| {
             r.pratt(r.parse("primary"), |ops| {
-                ops.infix(r.sequence((r.parse("ws"), r.lit("<"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
-                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
-                    .postfix_call("(", ")", ",", 10, quote!(|c, a, _| Ok(c)))
+                ops.infix(
+                    r.sequence((r.parse("ws"), r.lit("<"))),
+                    5,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(l)),
+                )
+                .infix(
+                    r.sequence((r.parse("ws"), r.lit(">"))),
+                    5,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(l)),
+                )
+                .postfix_call("(", ")", ",", 10, quote!(|c, a, _| Ok(c)))
             })
         })
         .rule("primary", |r| {
             r.sequence((r.parse("ws"), r.parse("primary_inner")))
-                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }))
+                .ast(quote!(|r, _| {
+                    if let ParseResult::List(mut items) = r {
+                        Ok(items.pop().unwrap_or(ParseResult::None))
+                    } else {
+                        Ok(r)
+                    }
+                }))
         })
         .rule("primary_inner", |r| {
             r.choice((
@@ -66,10 +82,7 @@ pub fn bad_grammar() -> CompiledGrammar {
         })
         // Full type - can be nested and cause backtracking
         .rule("type", |r| {
-            r.choice((
-                r.parse("type_reference"),
-                r.parse("identifier"),
-            ))
+            r.choice((r.parse("type_reference"), r.parse("identifier")))
         })
         // Type reference with optional nested type arguments
         .rule("type_reference", |r| {
@@ -93,20 +106,33 @@ pub fn good_grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("expr", |r| {
             r.pratt(r.parse("primary"), |ops| {
-                ops.infix(r.sequence((r.parse("ws"), r.lit("<"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
-                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
-                    .postfix_call("(", ")", ",", 10, quote!(|c, a, _| Ok(c)))
+                ops.infix(
+                    r.sequence((r.parse("ws"), r.lit("<"))),
+                    5,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(l)),
+                )
+                .infix(
+                    r.sequence((r.parse("ws"), r.lit(">"))),
+                    5,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(l)),
+                )
+                .postfix_call("(", ")", ",", 10, quote!(|c, a, _| Ok(c)))
             })
         })
         .rule("primary", |r| {
             r.sequence((r.parse("ws"), r.parse("primary_inner")))
-                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }))
+                .ast(quote!(|r, _| {
+                    if let ParseResult::List(mut items) = r {
+                        Ok(items.pop().unwrap_or(ParseResult::None))
+                    } else {
+                        Ok(r)
+                    }
+                }))
         })
         .rule("primary_inner", |r| {
-            r.choice((
-                r.parse("generic_call"),
-                r.parse("identifier"),
-            ))
+            r.choice((r.parse("generic_call"), r.parse("identifier")))
         })
         // Generic call with simple type arguments
         .rule("generic_call", |r| {
@@ -141,20 +167,33 @@ pub fn auto_memoized_grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("expr", |r| {
             r.pratt(r.parse("primary"), |ops| {
-                ops.infix(r.sequence((r.parse("ws"), r.lit("<"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
-                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
-                    .postfix_call("(", ")", ",", 10, quote!(|c, a, _| Ok(c)))
+                ops.infix(
+                    r.sequence((r.parse("ws"), r.lit("<"))),
+                    5,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(l)),
+                )
+                .infix(
+                    r.sequence((r.parse("ws"), r.lit(">"))),
+                    5,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(l)),
+                )
+                .postfix_call("(", ")", ",", 10, quote!(|c, a, _| Ok(c)))
             })
         })
         .rule("primary", |r| {
             r.sequence((r.parse("ws"), r.parse("primary_inner")))
-                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }))
+                .ast(quote!(|r, _| {
+                    if let ParseResult::List(mut items) = r {
+                        Ok(items.pop().unwrap_or(ParseResult::None))
+                    } else {
+                        Ok(r)
+                    }
+                }))
         })
         .rule("primary_inner", |r| {
-            r.choice((
-                r.parse("generic_call"),
-                r.parse("identifier"),
-            ))
+            r.choice((r.parse("generic_call"), r.parse("identifier")))
         })
         // Generic call: identifier<types>(args)
         // Uses full type_arguments which would cause backtracking without memoization
@@ -177,10 +216,7 @@ pub fn auto_memoized_grammar() -> CompiledGrammar {
         })
         // Full type - can be nested
         .rule("type", |r| {
-            r.choice((
-                r.parse("type_reference"),
-                r.parse("identifier"),
-            ))
+            r.choice((r.parse("type_reference"), r.parse("identifier")))
         })
         // Type reference with optional nested type arguments
         .rule("type_reference", |r| {
@@ -204,14 +240,30 @@ pub fn memoized_grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("expr", |r| {
             r.pratt(r.parse("primary"), |ops| {
-                ops.infix(r.sequence((r.parse("ws"), r.lit("<"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
-                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
-                    .postfix_call("(", ")", ",", 10, quote!(|c, a, _| Ok(c)))
+                ops.infix(
+                    r.sequence((r.parse("ws"), r.lit("<"))),
+                    5,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(l)),
+                )
+                .infix(
+                    r.sequence((r.parse("ws"), r.lit(">"))),
+                    5,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(l)),
+                )
+                .postfix_call("(", ")", ",", 10, quote!(|c, a, _| Ok(c)))
             })
         })
         .rule("primary", |r| {
             r.sequence((r.parse("ws"), r.parse("primary_inner")))
-                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }))
+                .ast(quote!(|r, _| {
+                    if let ParseResult::List(mut items) = r {
+                        Ok(items.pop().unwrap_or(ParseResult::None))
+                    } else {
+                        Ok(r)
+                    }
+                }))
         })
         .rule("primary_inner", |r| {
             r.choice((
@@ -241,10 +293,7 @@ pub fn memoized_grammar() -> CompiledGrammar {
         })
         // Full type - can be nested
         .rule("type", |r| {
-            r.choice((
-                r.parse("type_reference"),
-                r.parse("identifier"),
-            ))
+            r.choice((r.parse("type_reference"), r.parse("identifier")))
         })
         // Type reference with optional nested type arguments
         .rule("type_reference", |r| {

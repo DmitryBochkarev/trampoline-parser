@@ -105,10 +105,12 @@ pub fn grammar() -> CompiledGrammar {
         // Boolean: #t or #f
         .rule("boolean", |r| {
             r.choice((
-                r.lit("#t")
-                    .ast(quote!(|_, _| Ok(ParseResult::Scheme(SchemeValue::Boolean(true))))),
-                r.lit("#f")
-                    .ast(quote!(|_, _| Ok(ParseResult::Scheme(SchemeValue::Boolean(false))))),
+                r.lit("#t").ast(quote!(|_, _| Ok(ParseResult::Scheme(
+                    SchemeValue::Boolean(true)
+                )))),
+                r.lit("#f").ast(quote!(|_, _| Ok(ParseResult::Scheme(
+                    SchemeValue::Boolean(false)
+                )))),
             ))
         })
         // Character: #\x, #\newline, #\space, #\tab

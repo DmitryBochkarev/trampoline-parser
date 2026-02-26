@@ -6,13 +6,13 @@
 //! - Parser struct with trampoline loop
 //! - Character-level matching functions
 
+use crate::CompiledGrammar;
 use crate::ir::{
     CharClass, CombRef, Combinator, CombinatorIndex, CompiledCapDef, CompiledChoiceDef,
     CompiledInfixOp, CompiledLookDef, CompiledLoopDef, CompiledMapDef, CompiledMemoDef,
     CompiledOptDef, CompiledPostfixOp, CompiledPrattDef, CompiledPrefixOp, CompiledRuleDef,
     CompiledSepByDef, CompiledSeqDef, CompiledSkipDef, CompiledTernaryOp, PatternInfo, PostfixOp,
 };
-use crate::CompiledGrammar;
 
 /// Code generator
 pub struct CodeGenerator<'a> {

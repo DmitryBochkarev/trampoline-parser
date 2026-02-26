@@ -7,11 +7,31 @@ pub fn grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("expr", |r| {
             r.pratt(r.parse("number"), |ops| {
-                ops.infix("+", 1, Assoc::Left, quote!(|l, r, _| Ok(binary(l, r, Op::Add))))
-                    .infix("-", 1, Assoc::Left, quote!(|l, r, _| Ok(binary(l, r, Op::Sub))))
-                    .infix("*", 2, Assoc::Left, quote!(|l, r, _| Ok(binary(l, r, Op::Mul))))
-                    .infix("/", 2, Assoc::Left, quote!(|l, r, _| Ok(binary(l, r, Op::Div))))
-                    .prefix("-", 3, quote!(|e, _| Ok(unary(e, Op::Neg))))
+                ops.infix(
+                    "+",
+                    1,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(binary(l, r, Op::Add))),
+                )
+                .infix(
+                    "-",
+                    1,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(binary(l, r, Op::Sub))),
+                )
+                .infix(
+                    "*",
+                    2,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(binary(l, r, Op::Mul))),
+                )
+                .infix(
+                    "/",
+                    2,
+                    Assoc::Left,
+                    quote!(|l, r, _| Ok(binary(l, r, Op::Div))),
+                )
+                .prefix("-", 3, quote!(|e, _| Ok(unary(e, Op::Neg))))
             })
         })
         .rule("number", |r| r.capture(r.one_or_more(r.digit())))

@@ -16,18 +16,40 @@ pub fn grammar() -> CompiledGrammar {
         .rule("chunk", |r| {
             r.sequence((
                 r.parse("ws"),
-                r.zero_or_more(r.sequence((
-                    r.parse("statement"),
-                    r.parse("ws"),
-                ))),
+                r.zero_or_more(r.sequence((r.parse("statement"), r.parse("ws")))),
             ))
             // Structure: List([ws_result, List([List([Stmt, ws]), List([Stmt, ws]), ...])])
             // items[0] = ws result (None due to skip)
             // items[1] = zero_or_more result: List of iterations
             // Each iteration is List([Stmt, ws])
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { if let Some(ParseResult::List(iterations)) = items.into_iter().nth(1) { let stmts: Vec<Stmt> = iterations.into_iter().filter_map(|iter| { if let ParseResult::List(parts) = iter { parts.into_iter().find_map(|p| if let ParseResult::Stmt(s) = p { Some(s) } else { None }) } else { None } }).collect(); Ok(ParseResult::Stmts(stmts)) } else { Ok(ParseResult::Stmts(vec![])) } } else { Ok(ParseResult::Stmts(vec![])) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    if let Some(ParseResult::List(iterations)) = items.into_iter().nth(1) {
+                        let stmts: Vec<Stmt> = iterations
+                            .into_iter()
+                            .filter_map(|iter| {
+                                if let ParseResult::List(parts) = iter {
+                                    parts.into_iter().find_map(|p| {
+                                        if let ParseResult::Stmt(s) = p {
+                                            Some(s)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        Ok(ParseResult::Stmts(stmts))
+                    } else {
+                        Ok(ParseResult::Stmts(vec![]))
+                    }
+                } else {
+                    Ok(ParseResult::Stmts(vec![]))
+                }
+            }))
         })
-
         // Statements
         .rule("statement", |r| {
             r.choice((
@@ -41,7 +63,6 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("assignment_or_call"),
             ))
         })
-
         // Local declaration: local name [= expr]
         .rule("local_decl", |r| {
             r.sequence((
@@ -49,22 +70,44 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws1"),
                 r.parse("name_list"),
                 r.parse("ws"),
-                r.optional(r.sequence((
-                    r.lit("="),
-                    r.parse("ws"),
-                    r.parse("expr_list"),
-                ))),
+                r.optional(r.sequence((r.lit("="), r.parse("ws"), r.parse("expr_list")))),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(parts) = r { let names = if let ParseResult::Names(n) = &parts[2] { n.clone() } else { vec![] }; let exprs = parts.get(4).and_then(|p| if let ParseResult::List(inner) = p { inner.get(2).and_then(|e| if let ParseResult::Exprs(es) = e { Some(es.clone()) } else { None }) } else { None }).unwrap_or_default(); Ok(ParseResult::Stmt(Stmt::Local(names, exprs))) } else { Ok(ParseResult::None) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(parts) = r {
+                    let names = if let ParseResult::Names(n) = &parts[2] {
+                        n.clone()
+                    } else {
+                        vec![]
+                    };
+                    let exprs = parts
+                        .get(4)
+                        .and_then(|p| {
+                            if let ParseResult::List(inner) = p {
+                                inner.get(2).and_then(|e| {
+                                    if let ParseResult::Exprs(es) = e {
+                                        Some(es.clone())
+                                    } else {
+                                        None
+                                    }
+                                })
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_default();
+                    Ok(ParseResult::Stmt(Stmt::Local(names, exprs)))
+                } else {
+                    Ok(ParseResult::None)
+                }
+            }))
         })
-
         // If statement: if expr then block {elseif expr then block} [else block] end
         .rule("if_statement", |r| {
             r.sequence((
                 r.parse("kw_if"),
                 r.parse("ws1"),
                 r.parse("expr"),
-                r.parse("ws"),  // ws not ws1: trailing ws already consumed by expr
+                r.parse("ws"), // ws not ws1: trailing ws already consumed by expr
                 r.parse("kw_then"),
                 r.parse("ws"),
                 r.parse("block"),
@@ -73,7 +116,7 @@ pub fn grammar() -> CompiledGrammar {
                     r.parse("kw_elseif"),
                     r.parse("ws1"),
                     r.parse("expr"),
-                    r.parse("ws"),  // ws not ws1: trailing ws already consumed by expr
+                    r.parse("ws"), // ws not ws1: trailing ws already consumed by expr
                     r.parse("kw_then"),
                     r.parse("ws"),
                     r.parse("block"),
@@ -89,14 +132,13 @@ pub fn grammar() -> CompiledGrammar {
             ))
             .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::If))))
         })
-
         // While statement: while expr do block end
         .rule("while_statement", |r| {
             r.sequence((
                 r.parse("kw_while"),
                 r.parse("ws1"),
                 r.parse("expr"),
-                r.parse("ws"),  // ws not ws1: trailing ws already consumed by expr
+                r.parse("ws"), // ws not ws1: trailing ws already consumed by expr
                 r.parse("kw_do"),
                 r.parse("ws"),
                 r.parse("block"),
@@ -105,7 +147,6 @@ pub fn grammar() -> CompiledGrammar {
             ))
             .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::While))))
         })
-
         // For statement: for name = expr, expr [, expr] do block end
         .rule("for_statement", |r| {
             r.sequence(vec![
@@ -120,13 +161,8 @@ pub fn grammar() -> CompiledGrammar {
                 r.lit(","),
                 r.parse("ws"),
                 r.parse("expr"),
-                r.optional(r.sequence((
-                    r.parse("ws"),
-                    r.lit(","),
-                    r.parse("ws"),
-                    r.parse("expr"),
-                ))),
-                r.parse("ws"),  // ws not ws1: trailing ws already consumed by expr
+                r.optional(r.sequence((r.parse("ws"), r.lit(","), r.parse("ws"), r.parse("expr")))),
+                r.parse("ws"), // ws not ws1: trailing ws already consumed by expr
                 r.parse("kw_do"),
                 r.parse("ws"),
                 r.parse("block"),
@@ -135,7 +171,6 @@ pub fn grammar() -> CompiledGrammar {
             ])
             .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::For))))
         })
-
         // Repeat statement: repeat block until expr
         .rule("repeat_statement", |r| {
             r.sequence((
@@ -149,7 +184,6 @@ pub fn grammar() -> CompiledGrammar {
             ))
             .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::Repeat))))
         })
-
         // Function declaration: function name ( [params] ) block end
         .rule("function_decl", |r| {
             r.sequence(vec![
@@ -169,19 +203,14 @@ pub fn grammar() -> CompiledGrammar {
             ])
             .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::Function))))
         })
-
         // Return statement: return [expr_list]
         .rule("return_statement", |r| {
             r.sequence((
                 r.parse("kw_return"),
-                r.optional(r.sequence((
-                    r.parse("ws1"),
-                    r.parse("expr_list"),
-                ))),
+                r.optional(r.sequence((r.parse("ws1"), r.parse("expr_list")))),
             ))
             .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::Return))))
         })
-
         // Assignment or function call (disambiguated by context)
         .rule("assignment_or_call", |r| {
             r.sequence((
@@ -195,16 +224,11 @@ pub fn grammar() -> CompiledGrammar {
             ))
             .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::AssignOrCall))))
         })
-
         // Block: sequence of statements (used inside control structures)
         .rule("block", |r| {
-            r.zero_or_more(r.sequence((
-                r.parse("statement"),
-                r.parse("ws"),
-            )))
-            .ast(quote!(|_, _| Ok(ParseResult::None)))
+            r.zero_or_more(r.sequence((r.parse("statement"), r.parse("ws"))))
+                .ast(quote!(|_, _| Ok(ParseResult::None)))
         })
-
         // Expression using Pratt parsing - infix/postfix only
         // Prefix operators handled in grammar rules for proper ws handling
         // Infix operators use patterns with leading ws rule to handle "a.x * b" patterns
@@ -212,49 +236,145 @@ pub fn grammar() -> CompiledGrammar {
             r.pratt(r.parse("unary"), |ops| {
                 ops
                     // Postfix operators (highest binding)
-                    .postfix_call("(", ")", ",", 18, quote!(|callee, args, _| Ok(call_expr(callee, args))))
+                    .postfix_call(
+                        "(",
+                        ")",
+                        ",",
+                        18,
+                        quote!(|callee, args, _| Ok(call_expr(callee, args))),
+                    )
                     .postfix_index("[", "]", 18, quote!(|obj, idx, _| Ok(make_index(obj, idx))))
                     // Use pattern to prevent matching ".." as member access
-                    .postfix_member_pattern(r.sequence((r.lit("."), r.not_followed_by(r.char('.')))), 18, quote!(|obj, prop, _| Ok(member_expr(obj, prop))))
-
+                    .postfix_member_pattern(
+                        r.sequence((r.lit("."), r.not_followed_by(r.char('.')))),
+                        18,
+                        quote!(|obj, prop, _| Ok(member_expr(obj, prop))),
+                    )
                     // Power (right-associative, very high precedence)
-                    .infix(r.sequence((r.parse("ws"), r.lit("^"))), 12, Assoc::Right, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Pow))))
-
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit("^"))),
+                        12,
+                        Assoc::Right,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Pow))),
+                    )
                     // Multiplicative
-                    .infix(r.sequence((r.parse("ws"), r.lit("*"))), 10, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Mul))))
-                    .infix(r.sequence((r.parse("ws"), r.lit("//"))), 10, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::FloorDiv))))
-                    .infix(r.sequence((r.parse("ws"), r.lit("/"))), 10, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Div))))
-                    .infix(r.sequence((r.parse("ws"), r.lit("%"))), 10, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Mod))))
-
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit("*"))),
+                        10,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Mul))),
+                    )
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit("//"))),
+                        10,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::FloorDiv))),
+                    )
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit("/"))),
+                        10,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Div))),
+                    )
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit("%"))),
+                        10,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Mod))),
+                    )
                     // Additive
-                    .infix(r.sequence((r.parse("ws"), r.lit("+"))), 9, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Add))))
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit("+"))),
+                        9,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Add))),
+                    )
                     // Use pattern to ensure "-" isn't followed by "-" (which would be a comment)
-                    .infix(r.sequence((r.parse("ws"), r.lit("-"), r.not_followed_by(r.lit("-")))), 9, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Sub))))
-
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit("-"), r.not_followed_by(r.lit("-")))),
+                        9,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Sub))),
+                    )
                     // String concatenation (right-associative)
-                    .infix(r.sequence((r.parse("ws"), r.lit(".."))), 8, Assoc::Right, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Concat))))
-
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit(".."))),
+                        8,
+                        Assoc::Right,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Concat))),
+                    )
                     // Comparison
-                    .infix(r.sequence((r.parse("ws"), r.lit("=="))), 4, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Eq))))
-                    .infix(r.sequence((r.parse("ws"), r.lit("~="))), 4, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::NotEq))))
-                    .infix(r.sequence((r.parse("ws"), r.lit("<="))), 4, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Le))))
-                    .infix(r.sequence((r.parse("ws"), r.lit(">="))), 4, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Ge))))
-                    .infix(r.sequence((r.parse("ws"), r.lit("<"))), 4, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Lt))))
-                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 4, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Gt))))
-
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit("=="))),
+                        4,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Eq))),
+                    )
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit("~="))),
+                        4,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::NotEq))),
+                    )
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit("<="))),
+                        4,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Le))),
+                    )
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit(">="))),
+                        4,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Ge))),
+                    )
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit("<"))),
+                        4,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Lt))),
+                    )
+                    .infix(
+                        r.sequence((r.parse("ws"), r.lit(">"))),
+                        4,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Gt))),
+                    )
                     // Logical (keyword operators - include ws in pattern)
-                    .infix(r.sequence((r.parse("ws"), r.lit("and"), r.not_followed_by(r.ident_cont()))), 3, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::And))))
-                    .infix(r.sequence((r.parse("ws"), r.lit("or"), r.not_followed_by(r.ident_cont()))), 2, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Or))))
+                    .infix(
+                        r.sequence((
+                            r.parse("ws"),
+                            r.lit("and"),
+                            r.not_followed_by(r.ident_cont()),
+                        )),
+                        3,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::And))),
+                    )
+                    .infix(
+                        r.sequence((
+                            r.parse("ws"),
+                            r.lit("or"),
+                            r.not_followed_by(r.ident_cont()),
+                        )),
+                        2,
+                        Assoc::Left,
+                        quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Or))),
+                    )
             })
         })
-
         // Unary expressions - prefix operators handled here (not in Pratt)
         // This allows ws to be consumed before checking for prefix ops
         .rule("unary", |r| {
             r.sequence((r.parse("ws"), r.parse("unary_inner"), r.parse("ws")))
-                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(1)) } else { Ok(r) } }))
+                .ast(quote!(|r, _| {
+                    if let ParseResult::List(mut items) = r {
+                        Ok(items.remove(1))
+                    } else {
+                        Ok(r)
+                    }
+                }))
         })
-
         .rule("unary_inner", |r| {
             r.choice((
                 r.parse("prefix_not"),
@@ -263,33 +383,47 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("primary"),
             ))
         })
-
         .rule("prefix_not", |r| {
             r.sequence((
                 r.lit("not"),
                 r.not_followed_by(r.ident_cont()),
-                r.parse("unary"),  // recursive - handles ws and more prefixes
+                r.parse("unary"), // recursive - handles ws and more prefixes
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let e = items.into_iter().last().unwrap_or(ParseResult::None); Ok(unary_expr(e, UnOp::Not)) } else { Ok(r) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    let e = items.into_iter().last().unwrap_or(ParseResult::None);
+                    Ok(unary_expr(e, UnOp::Not))
+                } else {
+                    Ok(r)
+                }
+            }))
         })
-
         .rule("prefix_neg", |r| {
             r.sequence((
                 r.lit("-"),
-                r.not_followed_by(r.lit("-")),  // not a comment
+                r.not_followed_by(r.lit("-")), // not a comment
                 r.parse("unary"),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let e = items.into_iter().last().unwrap_or(ParseResult::None); Ok(unary_expr(e, UnOp::Neg)) } else { Ok(r) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    let e = items.into_iter().last().unwrap_or(ParseResult::None);
+                    Ok(unary_expr(e, UnOp::Neg))
+                } else {
+                    Ok(r)
+                }
+            }))
         })
-
         .rule("prefix_len", |r| {
-            r.sequence((
-                r.lit("#"),
-                r.parse("unary"),
-            ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let e = items.into_iter().last().unwrap_or(ParseResult::None); Ok(unary_expr(e, UnOp::Len)) } else { Ok(r) } }))
+            r.sequence((r.lit("#"), r.parse("unary")))
+                .ast(quote!(|r, _| {
+                    if let ParseResult::List(items) = r {
+                        let e = items.into_iter().last().unwrap_or(ParseResult::None);
+                        Ok(unary_expr(e, UnOp::Len))
+                    } else {
+                        Ok(r)
+                    }
+                }))
         })
-
         // Primary expression
         .rule("primary", |r| {
             r.choice((
@@ -304,25 +438,28 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("identifier"),
             ))
         })
-
         // Prefix expression (for assignment LHS)
         .rule("prefix_expr", |r| {
             r.pratt(r.parse("prefix_primary"), |ops| {
-                ops
-                    .postfix_call("(", ")", ",", 18, quote!(|callee, args, _| Ok(call_expr(callee, args))))
-                    .postfix_index("[", "]", 18, quote!(|obj, idx, _| Ok(make_index(obj, idx))))
-                    // Use pattern to prevent matching ".." as member access
-                    .postfix_member_pattern(r.sequence((r.lit("."), r.not_followed_by(r.char('.')))), 18, quote!(|obj, prop, _| Ok(member_expr(obj, prop))))
+                ops.postfix_call(
+                    "(",
+                    ")",
+                    ",",
+                    18,
+                    quote!(|callee, args, _| Ok(call_expr(callee, args))),
+                )
+                .postfix_index("[", "]", 18, quote!(|obj, idx, _| Ok(make_index(obj, idx))))
+                // Use pattern to prevent matching ".." as member access
+                .postfix_member_pattern(
+                    r.sequence((r.lit("."), r.not_followed_by(r.char('.')))),
+                    18,
+                    quote!(|obj, prop, _| Ok(member_expr(obj, prop))),
+                )
             })
         })
-
         .rule("prefix_primary", |r| {
-            r.choice((
-                r.parse("paren_expr"),
-                r.parse("identifier"),
-            ))
+            r.choice((r.parse("paren_expr"), r.parse("identifier")))
         })
-
         // Parenthesized expression
         .rule("paren_expr", |r| {
             r.sequence((
@@ -332,9 +469,14 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.lit(")"),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(2)) } else { Ok(r) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(mut items) = r {
+                    Ok(items.remove(2))
+                } else {
+                    Ok(r)
+                }
+            }))
         })
-
         // Function expression: function ( [params] ) block end
         .rule("function_expr", |r| {
             r.sequence((
@@ -352,7 +494,6 @@ pub fn grammar() -> CompiledGrammar {
             ))
             .ast(quote!(|_, _| Ok(ParseResult::Expr(Expr::Function))))
         })
-
         // Table constructor
         .rule("table", |r| {
             r.sequence((
@@ -362,22 +503,52 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.lit("}"),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let fields = items.get(2).and_then(|f| if let ParseResult::Fields(fs) = f { Some(fs.clone()) } else { None }).unwrap_or_default(); Ok(ParseResult::Expr(Expr::Table(fields))) } else { Ok(ParseResult::Expr(Expr::Table(vec![]))) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    let fields = items
+                        .get(2)
+                        .and_then(|f| {
+                            if let ParseResult::Fields(fs) = f {
+                                Some(fs.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_default();
+                    Ok(ParseResult::Expr(Expr::Table(fields)))
+                } else {
+                    Ok(ParseResult::Expr(Expr::Table(vec![])))
+                }
+            }))
         })
-
         // Field list: field { fieldsep field } [fieldsep]
         .rule("field_list", |r| {
             r.sequence((
                 r.parse("field"),
-                r.zero_or_more(r.sequence((
-                    r.parse("field_sep"),
-                    r.parse("field"),
-                ))),
+                r.zero_or_more(r.sequence((r.parse("field_sep"), r.parse("field")))),
                 r.optional(r.parse("field_sep")),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let mut fields = vec![]; if let ParseResult::Field(f) = &items[0] { fields.push(f.clone()); } if let ParseResult::List(rest) = &items[1] { for item in rest.iter() { if let ParseResult::List(pair) = item { if let Some(ParseResult::Field(f)) = pair.get(1) { fields.push(f.clone()); } } } } Ok(ParseResult::Fields(fields)) } else { Ok(ParseResult::Fields(vec![])) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    let mut fields = vec![];
+                    if let ParseResult::Field(f) = &items[0] {
+                        fields.push(f.clone());
+                    }
+                    if let ParseResult::List(rest) = &items[1] {
+                        for item in rest.iter() {
+                            if let ParseResult::List(pair) = item {
+                                if let Some(ParseResult::Field(f)) = pair.get(1) {
+                                    fields.push(f.clone());
+                                }
+                            }
+                        }
+                    }
+                    Ok(ParseResult::Fields(fields))
+                } else {
+                    Ok(ParseResult::Fields(vec![]))
+                }
+            }))
         })
-
         // Field: [expr] = expr | name = expr | expr
         .rule("field", |r| {
             r.choice((
@@ -386,7 +557,6 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("array_field"),
             ))
         })
-
         .rule("computed_field", |r| {
             r.sequence((
                 r.lit("["),
@@ -399,9 +569,16 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.parse("expr"),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let key = to_expr(items.get(2).cloned().unwrap_or(ParseResult::None)); let val = to_expr(items.get(8).cloned().unwrap_or(ParseResult::None)); Ok(ParseResult::Field(Field::Computed(key, val))) } else { Ok(ParseResult::None) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    let key = to_expr(items.get(2).cloned().unwrap_or(ParseResult::None));
+                    let val = to_expr(items.get(8).cloned().unwrap_or(ParseResult::None));
+                    Ok(ParseResult::Field(Field::Computed(key, val)))
+                } else {
+                    Ok(ParseResult::None)
+                }
+            }))
         })
-
         .rule("named_field", |r| {
             r.sequence((
                 r.parse("identifier"),
@@ -410,14 +587,26 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.parse("expr"),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let name = if let ParseResult::Expr(Expr::Ident(n)) = &items[0] { n.clone() } else { String::new() }; let val = to_expr(items.get(4).cloned().unwrap_or(ParseResult::None)); Ok(ParseResult::Field(Field::Named(name, val))) } else { Ok(ParseResult::None) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    let name = if let ParseResult::Expr(Expr::Ident(n)) = &items[0] {
+                        n.clone()
+                    } else {
+                        String::new()
+                    };
+                    let val = to_expr(items.get(4).cloned().unwrap_or(ParseResult::None));
+                    Ok(ParseResult::Field(Field::Named(name, val)))
+                } else {
+                    Ok(ParseResult::None)
+                }
+            }))
         })
-
         .rule("array_field", |r| {
-            r.parse("expr")
-            .ast(quote!(|r, _| { let e = to_expr(r); Ok(ParseResult::Field(Field::Array(e))) }))
+            r.parse("expr").ast(quote!(|r, _| {
+                let e = to_expr(r);
+                Ok(ParseResult::Field(Field::Array(e)))
+            }))
         })
-
         .rule("field_sep", |r| {
             r.sequence((
                 r.parse("ws"),
@@ -425,32 +614,19 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
             ))
         })
-
         // Literals
         .rule("nil", |r| {
-            r.sequence((
-                r.lit("nil"),
-                r.not_followed_by(r.ident_cont()),
-            ))
-            .ast(quote!(|_, _| Ok(ParseResult::Expr(Expr::Nil))))
+            r.sequence((r.lit("nil"), r.not_followed_by(r.ident_cont())))
+                .ast(quote!(|_, _| Ok(ParseResult::Expr(Expr::Nil))))
         })
-
         .rule("true", |r| {
-            r.sequence((
-                r.lit("true"),
-                r.not_followed_by(r.ident_cont()),
-            ))
-            .ast(quote!(|_, _| Ok(ParseResult::Expr(Expr::Bool(true)))))
+            r.sequence((r.lit("true"), r.not_followed_by(r.ident_cont())))
+                .ast(quote!(|_, _| Ok(ParseResult::Expr(Expr::Bool(true)))))
         })
-
         .rule("false", |r| {
-            r.sequence((
-                r.lit("false"),
-                r.not_followed_by(r.ident_cont()),
-            ))
-            .ast(quote!(|_, _| Ok(ParseResult::Expr(Expr::Bool(false)))))
+            r.sequence((r.lit("false"), r.not_followed_by(r.ident_cont())))
+                .ast(quote!(|_, _| Ok(ParseResult::Expr(Expr::Bool(false)))))
         })
-
         // Number: integer, float, hex, scientific
         .rule("number", |r| {
             r.capture(r.choice((
@@ -458,9 +634,14 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("float_number"),
                 r.parse("int_number"),
             )))
-            .ast(quote!(|r, _| { if let ParseResult::Text(s, _) = r { Ok(ParseResult::Expr(Expr::Number(s))) } else { Ok(ParseResult::None) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::Text(s, _) = r {
+                    Ok(ParseResult::Expr(Expr::Number(s)))
+                } else {
+                    Ok(ParseResult::None)
+                }
+            }))
         })
-
         .rule("hex_number", |r| {
             r.sequence((
                 r.lit("0"),
@@ -468,7 +649,6 @@ pub fn grammar() -> CompiledGrammar {
                 r.one_or_more(r.hex_digit()),
             ))
         })
-
         .rule("float_number", |r| {
             r.sequence((
                 r.one_or_more(r.digit()),
@@ -482,11 +662,7 @@ pub fn grammar() -> CompiledGrammar {
                 )),
             ))
         })
-
-        .rule("int_number", |r| {
-            r.one_or_more(r.digit())
-        })
-
+        .rule("int_number", |r| r.one_or_more(r.digit()))
         .rule("exponent", |r| {
             r.sequence((
                 r.choice((r.char('e'), r.char('E'))),
@@ -494,7 +670,6 @@ pub fn grammar() -> CompiledGrammar {
                 r.one_or_more(r.digit()),
             ))
         })
-
         // String: double-quoted, single-quoted, or raw [[...]]
         .rule("string", |r| {
             r.choice((
@@ -503,7 +678,6 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("raw_string"),
             ))
         })
-
         .rule("double_string", |r| {
             r.sequence((
                 r.char('"'),
@@ -516,9 +690,18 @@ pub fn grammar() -> CompiledGrammar {
                 )))),
                 r.char('"'),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { if let ParseResult::Text(s, _) = &items[1] { Ok(ParseResult::Expr(Expr::String(s.clone()))) } else { Ok(ParseResult::Expr(Expr::String(String::new()))) } } else { Ok(ParseResult::None) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    if let ParseResult::Text(s, _) = &items[1] {
+                        Ok(ParseResult::Expr(Expr::String(s.clone())))
+                    } else {
+                        Ok(ParseResult::Expr(Expr::String(String::new())))
+                    }
+                } else {
+                    Ok(ParseResult::None)
+                }
+            }))
         })
-
         .rule("single_string", |r| {
             r.sequence((
                 r.char('\''),
@@ -531,21 +714,38 @@ pub fn grammar() -> CompiledGrammar {
                 )))),
                 r.char('\''),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { if let ParseResult::Text(s, _) = &items[1] { Ok(ParseResult::Expr(Expr::String(s.clone()))) } else { Ok(ParseResult::Expr(Expr::String(String::new()))) } } else { Ok(ParseResult::None) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    if let ParseResult::Text(s, _) = &items[1] {
+                        Ok(ParseResult::Expr(Expr::String(s.clone())))
+                    } else {
+                        Ok(ParseResult::Expr(Expr::String(String::new())))
+                    }
+                } else {
+                    Ok(ParseResult::None)
+                }
+            }))
         })
-
         .rule("raw_string", |r| {
             r.sequence((
                 r.lit("[["),
-                r.capture(r.zero_or_more(r.sequence((
-                    r.not_followed_by(r.lit("]]")),
-                    r.any_char(),
-                )))),
+                r.capture(
+                    r.zero_or_more(r.sequence((r.not_followed_by(r.lit("]]")), r.any_char()))),
+                ),
                 r.lit("]]"),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { if let ParseResult::Text(s, _) = &items[1] { Ok(ParseResult::Expr(Expr::String(s.clone()))) } else { Ok(ParseResult::Expr(Expr::String(String::new()))) } } else { Ok(ParseResult::None) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    if let ParseResult::Text(s, _) = &items[1] {
+                        Ok(ParseResult::Expr(Expr::String(s.clone())))
+                    } else {
+                        Ok(ParseResult::Expr(Expr::String(String::new())))
+                    }
+                } else {
+                    Ok(ParseResult::None)
+                }
+            }))
         })
-
         // Identifier (not a keyword)
         .rule("identifier", |r| {
             r.sequence((
@@ -555,46 +755,108 @@ pub fn grammar() -> CompiledGrammar {
                     r.zero_or_more(r.choice((r.alpha_num(), r.char('_')))),
                 ))),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { if let ParseResult::Text(s, _) = &items[1] { Ok(ParseResult::Expr(Expr::Ident(s.clone()))) } else { Ok(ParseResult::None) } } else { Ok(ParseResult::None) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    if let ParseResult::Text(s, _) = &items[1] {
+                        Ok(ParseResult::Expr(Expr::Ident(s.clone())))
+                    } else {
+                        Ok(ParseResult::None)
+                    }
+                } else {
+                    Ok(ParseResult::None)
+                }
+            }))
         })
-
         // Keywords (for negative lookahead)
         .rule("keyword", |r| {
             r.sequence((
                 r.choice(vec![
-                    r.lit("and"), r.lit("break"), r.lit("do"), r.lit("else"),
-                    r.lit("elseif"), r.lit("end"), r.lit("false"), r.lit("for"),
-                    r.lit("function"), r.lit("if"), r.lit("in"), r.lit("local"),
-                    r.lit("nil"), r.lit("not"), r.lit("or"), r.lit("repeat"),
-                    r.lit("return"), r.lit("then"), r.lit("true"), r.lit("until"),
+                    r.lit("and"),
+                    r.lit("break"),
+                    r.lit("do"),
+                    r.lit("else"),
+                    r.lit("elseif"),
+                    r.lit("end"),
+                    r.lit("false"),
+                    r.lit("for"),
+                    r.lit("function"),
+                    r.lit("if"),
+                    r.lit("in"),
+                    r.lit("local"),
+                    r.lit("nil"),
+                    r.lit("not"),
+                    r.lit("or"),
+                    r.lit("repeat"),
+                    r.lit("return"),
+                    r.lit("then"),
+                    r.lit("true"),
+                    r.lit("until"),
                     r.lit("while"),
                 ]),
                 r.not_followed_by(r.choice((r.alpha_num(), r.char('_')))),
             ))
         })
-
         // Individual keywords with boundary checking
-        .rule("kw_and", |r| r.sequence((r.lit("and"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_do", |r| r.sequence((r.lit("do"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_else", |r| r.sequence((r.lit("else"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_elseif", |r| r.sequence((r.lit("elseif"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_end", |r| r.sequence((r.lit("end"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_false", |r| r.sequence((r.lit("false"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_for", |r| r.sequence((r.lit("for"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_function", |r| r.sequence((r.lit("function"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_if", |r| r.sequence((r.lit("if"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_in", |r| r.sequence((r.lit("in"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_local", |r| r.sequence((r.lit("local"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_nil", |r| r.sequence((r.lit("nil"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_not", |r| r.sequence((r.lit("not"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_or", |r| r.sequence((r.lit("or"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_repeat", |r| r.sequence((r.lit("repeat"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_return", |r| r.sequence((r.lit("return"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_then", |r| r.sequence((r.lit("then"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_true", |r| r.sequence((r.lit("true"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_until", |r| r.sequence((r.lit("until"), r.not_followed_by(r.ident_cont()))))
-        .rule("kw_while", |r| r.sequence((r.lit("while"), r.not_followed_by(r.ident_cont()))))
-
+        .rule("kw_and", |r| {
+            r.sequence((r.lit("and"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_do", |r| {
+            r.sequence((r.lit("do"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_else", |r| {
+            r.sequence((r.lit("else"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_elseif", |r| {
+            r.sequence((r.lit("elseif"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_end", |r| {
+            r.sequence((r.lit("end"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_false", |r| {
+            r.sequence((r.lit("false"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_for", |r| {
+            r.sequence((r.lit("for"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_function", |r| {
+            r.sequence((r.lit("function"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_if", |r| {
+            r.sequence((r.lit("if"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_in", |r| {
+            r.sequence((r.lit("in"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_local", |r| {
+            r.sequence((r.lit("local"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_nil", |r| {
+            r.sequence((r.lit("nil"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_not", |r| {
+            r.sequence((r.lit("not"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_or", |r| {
+            r.sequence((r.lit("or"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_repeat", |r| {
+            r.sequence((r.lit("repeat"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_return", |r| {
+            r.sequence((r.lit("return"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_then", |r| {
+            r.sequence((r.lit("then"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_true", |r| {
+            r.sequence((r.lit("true"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_until", |r| {
+            r.sequence((r.lit("until"), r.not_followed_by(r.ident_cont())))
+        })
+        .rule("kw_while", |r| {
+            r.sequence((r.lit("while"), r.not_followed_by(r.ident_cont())))
+        })
         // Helper rules
         .rule("name_list", |r| {
             r.sequence((
@@ -606,9 +868,27 @@ pub fn grammar() -> CompiledGrammar {
                     r.parse("identifier"),
                 ))),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let mut names = vec![]; if let ParseResult::Expr(Expr::Ident(n)) = &items[0] { names.push(n.clone()); } if let ParseResult::List(rest) = &items[1] { for item in rest.iter() { if let ParseResult::List(parts) = item { if let Some(ParseResult::Expr(Expr::Ident(n))) = parts.get(3) { names.push(n.clone()); } } } } Ok(ParseResult::Names(names)) } else { Ok(ParseResult::Names(vec![])) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    let mut names = vec![];
+                    if let ParseResult::Expr(Expr::Ident(n)) = &items[0] {
+                        names.push(n.clone());
+                    }
+                    if let ParseResult::List(rest) = &items[1] {
+                        for item in rest.iter() {
+                            if let ParseResult::List(parts) = item {
+                                if let Some(ParseResult::Expr(Expr::Ident(n))) = parts.get(3) {
+                                    names.push(n.clone());
+                                }
+                            }
+                        }
+                    }
+                    Ok(ParseResult::Names(names))
+                } else {
+                    Ok(ParseResult::Names(vec![]))
+                }
+            }))
         })
-
         .rule("expr_list", |r| {
             r.sequence((
                 r.parse("expr"),
@@ -619,9 +899,24 @@ pub fn grammar() -> CompiledGrammar {
                     r.parse("expr"),
                 ))),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let mut exprs = vec![to_expr(items[0].clone())]; if let ParseResult::List(rest) = &items[1] { for item in rest.iter() { if let ParseResult::List(parts) = item { if let Some(e) = parts.get(3) { exprs.push(to_expr(e.clone())); } } } } Ok(ParseResult::Exprs(exprs)) } else { Ok(ParseResult::Exprs(vec![])) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(items) = r {
+                    let mut exprs = vec![to_expr(items[0].clone())];
+                    if let ParseResult::List(rest) = &items[1] {
+                        for item in rest.iter() {
+                            if let ParseResult::List(parts) = item {
+                                if let Some(e) = parts.get(3) {
+                                    exprs.push(to_expr(e.clone()));
+                                }
+                            }
+                        }
+                    }
+                    Ok(ParseResult::Exprs(exprs))
+                } else {
+                    Ok(ParseResult::Exprs(vec![]))
+                }
+            }))
         })
-
         .rule("param_list", |r| {
             r.choice((
                 r.sequence((
@@ -636,43 +931,27 @@ pub fn grammar() -> CompiledGrammar {
                 r.lit("..."),
             ))
         })
-
         .rule("func_name", |r| {
             r.sequence((
                 r.parse("identifier"),
-                r.zero_or_more(r.sequence((
-                    r.lit("."),
-                    r.parse("identifier"),
-                ))),
-                r.optional(r.sequence((
-                    r.lit(":"),
-                    r.parse("identifier"),
-                ))),
+                r.zero_or_more(r.sequence((r.lit("."), r.parse("identifier")))),
+                r.optional(r.sequence((r.lit(":"), r.parse("identifier")))),
             ))
         })
-
         // Whitespace
-        .rule("ws", |r| r.skip(r.zero_or_more(r.choice((
-            r.ws(),
-            r.parse("line_comment"),
-        )))))
-
-        .rule("ws1", |r| r.skip(r.one_or_more(r.choice((
-            r.ws(),
-            r.parse("line_comment"),
-        )))))
-
+        .rule("ws", |r| {
+            r.skip(r.zero_or_more(r.choice((r.ws(), r.parse("line_comment")))))
+        })
+        .rule("ws1", |r| {
+            r.skip(r.one_or_more(r.choice((r.ws(), r.parse("line_comment")))))
+        })
         .rule("line_comment", |r| {
             r.sequence((
                 r.lit("--"),
                 r.not_followed_by(r.lit("[")),
-                r.zero_or_more(r.sequence((
-                    r.not_followed_by(r.char('\n')),
-                    r.any_char(),
-                ))),
+                r.zero_or_more(r.sequence((r.not_followed_by(r.char('\n')), r.any_char()))),
             ))
         })
-
         .ast_config(|c| {
             c.helper(HELPER_CODE)
                 .result_variant("Expr", "Expr")

@@ -18,18 +18,27 @@ pub fn bad_grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("program", |r| {
             r.sequence((r.parse("ws"), r.parse("list"), r.parse("ws")))
-                .ast(quote!(|r, _| { if let ParseResult::List(items) = r { Ok(items.into_iter().nth(1).unwrap_or(ParseResult::None)) } else { Ok(r) } }))
+                .ast(quote!(|r, _| {
+                    if let ParseResult::List(items) = r {
+                        Ok(items.into_iter().nth(1).unwrap_or(ParseResult::None))
+                    } else {
+                        Ok(r)
+                    }
+                }))
         })
         .rule("list", |r| {
             r.choice((
                 r.parse("empty_list"),
-                r.parse("dotted_list"),  // Tried first - shares prefix with proper_list
-                r.parse("proper_list"),  // Re-parses entire content on backtrack
+                r.parse("dotted_list"), // Tried first - shares prefix with proper_list
+                r.parse("proper_list"), // Re-parses entire content on backtrack
             ))
         })
         .rule("empty_list", |r| {
             r.sequence((r.char('('), r.parse("ws"), r.char(')')))
-                .ast(quote!(|_, _| Ok(ParseResult::Text("()".to_string(), Span::default()))))
+                .ast(quote!(|_, _| Ok(ParseResult::Text(
+                    "()".to_string(),
+                    Span::default()
+                ))))
         })
         // Dotted list: (a b . c)
         .rule("dotted_list", |r| {
@@ -43,7 +52,10 @@ pub fn bad_grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.char(')'),
             ))
-            .ast(quote!(|_, _| Ok(ParseResult::Text("dotted".to_string(), Span::default()))))
+            .ast(quote!(|_, _| Ok(ParseResult::Text(
+                "dotted".to_string(),
+                Span::default()
+            ))))
         })
         // Proper list: (a b c) - shares prefix with dotted_list!
         .rule("proper_list", |r| {
@@ -53,20 +65,14 @@ pub fn bad_grammar() -> CompiledGrammar {
                 r.one_or_more(r.sequence((r.parse("datum"), r.parse("ws")))),
                 r.char(')'),
             ))
-            .ast(quote!(|_, _| Ok(ParseResult::Text("proper".to_string(), Span::default()))))
+            .ast(quote!(|_, _| Ok(ParseResult::Text(
+                "proper".to_string(),
+                Span::default()
+            ))))
         })
-        .rule("datum", |r| {
-            r.choice((
-                r.parse("list"),
-                r.parse("symbol"),
-            ))
-        })
-        .rule("symbol", |r| {
-            r.capture(r.one_or_more(r.alpha()))
-        })
-        .rule("ws", |r| {
-            r.skip(r.zero_or_more(r.ws()))
-        })
+        .rule("datum", |r| r.choice((r.parse("list"), r.parse("symbol"))))
+        .rule("symbol", |r| r.capture(r.one_or_more(r.alpha())))
+        .rule("ws", |r| r.skip(r.zero_or_more(r.ws())))
         .build()
 }
 
@@ -80,17 +86,26 @@ pub fn good_grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("program", |r| {
             r.sequence((r.parse("ws"), r.parse("list"), r.parse("ws")))
-                .ast(quote!(|r, _| { if let ParseResult::List(items) = r { Ok(items.into_iter().nth(1).unwrap_or(ParseResult::None)) } else { Ok(r) } }))
+                .ast(quote!(|r, _| {
+                    if let ParseResult::List(items) = r {
+                        Ok(items.into_iter().nth(1).unwrap_or(ParseResult::None))
+                    } else {
+                        Ok(r)
+                    }
+                }))
         })
         .rule("list", |r| {
             r.choice((
                 r.parse("empty_list"),
-                r.parse("non_empty_list"),  // Handles both proper and dotted
+                r.parse("non_empty_list"), // Handles both proper and dotted
             ))
         })
         .rule("empty_list", |r| {
             r.sequence((r.char('('), r.parse("ws"), r.char(')')))
-                .ast(quote!(|_, _| Ok(ParseResult::Text("()".to_string(), Span::default()))))
+                .ast(quote!(|_, _| Ok(ParseResult::Text(
+                    "()".to_string(),
+                    Span::default()
+                ))))
         })
         // Non-empty list: handles both proper (a b c) and dotted (a b . c)
         // The dotted tail is OPTIONAL - no re-parsing needed
@@ -102,27 +117,16 @@ pub fn good_grammar() -> CompiledGrammar {
                 r.optional(r.parse("dotted_tail")),
                 r.char(')'),
             ))
-            .ast(quote!(|_, _| Ok(ParseResult::Text("list".to_string(), Span::default()))))
+            .ast(quote!(|_, _| Ok(ParseResult::Text(
+                "list".to_string(),
+                Span::default()
+            ))))
         })
         .rule("dotted_tail", |r| {
-            r.sequence((
-                r.char('.'),
-                r.parse("ws"),
-                r.parse("datum"),
-                r.parse("ws"),
-            ))
+            r.sequence((r.char('.'), r.parse("ws"), r.parse("datum"), r.parse("ws")))
         })
-        .rule("datum", |r| {
-            r.choice((
-                r.parse("list"),
-                r.parse("symbol"),
-            ))
-        })
-        .rule("symbol", |r| {
-            r.capture(r.one_or_more(r.alpha()))
-        })
-        .rule("ws", |r| {
-            r.skip(r.zero_or_more(r.ws()))
-        })
+        .rule("datum", |r| r.choice((r.parse("list"), r.parse("symbol"))))
+        .rule("symbol", |r| r.capture(r.one_or_more(r.alpha())))
+        .rule("ws", |r| r.skip(r.zero_or_more(r.ws())))
         .build()
 }

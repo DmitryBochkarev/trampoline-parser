@@ -23,7 +23,13 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("assignment_expression"),
                 r.zero_or_more(r.sequence((op(r, ","), r.parse("assignment_expression")))),
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(0)) } else { Ok(r) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(mut items) = r {
+                    Ok(items.remove(0))
+                } else {
+                    Ok(r)
+                }
+            }))
         })
         // Assignment expression - Pratt with MANY operators like TypeScript
         // NOTE: Wrapped in sequence to mimic TypeScript's structure
@@ -68,21 +74,33 @@ pub fn grammar() -> CompiledGrammar {
                         .postfix_member("?.", 18, quote!(|o, p, _| Ok(o)))
                         .postfix_member(".", 18, quote!(|o, p, _| Ok(o)))
                 }),
-                r.parse("ws"),  // Like TypeScript's optional "as Type" suffix
+                r.parse("ws"), // Like TypeScript's optional "as Type" suffix
             ))
-            .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(0)) } else { Ok(r) } }))
+            .ast(quote!(|r, _| {
+                if let ParseResult::List(mut items) = r {
+                    Ok(items.remove(0))
+                } else {
+                    Ok(r)
+                }
+            }))
         })
         // Primary expression with leading ws (for after infix operators)
         .rule("primary", |r| {
             r.sequence((r.parse("ws"), r.parse("primary_inner")))
-                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }))
+                .ast(quote!(|r, _| {
+                    if let ParseResult::List(mut items) = r {
+                        Ok(items.pop().unwrap_or(ParseResult::None))
+                    } else {
+                        Ok(r)
+                    }
+                }))
         })
         // Primary inner - various expression types
         // NOTE: arrow_function before parenthesized to mimic TypeScript
         .rule("primary_inner", |r| {
             r.choice((
                 r.parse("object_expression"),
-                r.parse("arrow_function"),  // tries first, may fail and backtrack
+                r.parse("arrow_function"), // tries first, may fail and backtrack
                 r.parse("parenthesized"),
                 r.parse("identifier"), // identifier with trailing ws
                 r.capture(r.one_or_more(r.digit())), // number
@@ -106,7 +124,7 @@ pub fn grammar() -> CompiledGrammar {
         // Parameter: identifier or object pattern
         .rule("param", |r| {
             r.choice((
-                r.parse("object_pattern"),  // { a: x } - destructuring
+                r.parse("object_pattern"), // { a: x } - destructuring
                 r.parse("identifier"),
             ))
         })
@@ -121,14 +139,21 @@ pub fn grammar() -> CompiledGrammar {
         // Object pattern property: key or key: pattern
         .rule("object_pattern_prop", |r| {
             r.sequence((
-                r.parse("identifier"),  // key
-                r.optional(r.sequence((op(r, ":"), r.parse("param")))),  // optional: pattern
+                r.parse("identifier"),                                  // key
+                r.optional(r.sequence((op(r, ":"), r.parse("param")))), // optional: pattern
             ))
         })
         // Parenthesized expression - wraps expression in parens
         .rule("parenthesized", |r| {
             r.sequence((op(r, "("), r.parse("expression"), op(r, ")")))
-                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { items.remove(1); Ok(items.remove(0)) } else { Ok(r) } }))
+                .ast(quote!(|r, _| {
+                    if let ParseResult::List(mut items) = r {
+                        items.remove(1);
+                        Ok(items.remove(0))
+                    } else {
+                        Ok(r)
+                    }
+                }))
         })
         // Object expression: { properties }
         .rule("object_expression", |r| {
@@ -141,36 +166,39 @@ pub fn grammar() -> CompiledGrammar {
         // Object property: choice like TypeScript (method_property before key_value)
         .rule("object_property", |r| {
             r.choice((
-                r.parse("method_property"),   // method(params) { } - tries first, will backtrack
+                r.parse("method_property"), // method(params) { } - tries first, will backtrack
                 r.parse("key_value_property"), // key: value
             ))
         })
         // Method property - like TypeScript with optional async/*, will match key then fail on (
         .rule("method_property", |r| {
             r.sequence((
-                r.optional(r.sequence((r.lit("async"), r.parse("ws")))),  // optional async
-                r.optional(r.sequence((r.lit("*"), r.parse("ws")))),      // optional *
-                r.parse("identifier"),  // parses key with trailing ws
-                op(r, "("),             // this will fail and cause backtrack
-                // ... rest doesn't matter, we'll never get here for key: value
+                r.optional(r.sequence((r.lit("async"), r.parse("ws")))), // optional async
+                r.optional(r.sequence((r.lit("*"), r.parse("ws")))),     // optional *
+                r.parse("identifier"), // parses key with trailing ws
+                op(r, "("),            // this will fail and cause backtrack
+                                       // ... rest doesn't matter, we'll never get here for key: value
             ))
         })
         // Key-value property: key: value (uses assignment_expression to avoid comma issues)
         .rule("key_value_property", |r| {
             r.sequence((
-                r.parse("identifier"),  // uses identifier with trailing ws
-                op(r, ":"),             // colon + ws after
-                r.parse("assignment_expression"),  // NESTED PRATT PARSER!
-                r.parse("ws"),          // ws after value (before , or })
+                r.parse("identifier"),            // uses identifier with trailing ws
+                op(r, ":"),                       // colon + ws after
+                r.parse("assignment_expression"), // NESTED PRATT PARSER!
+                r.parse("ws"),                    // ws after value (before , or })
             ))
         })
         // Identifier with trailing whitespace (like TypeScript)
         .rule("identifier", |r| {
-            r.sequence((
-                r.capture(r.one_or_more(r.alpha())),
-                r.parse("ws"),
-            ))
-            .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(0)) } else { Ok(r) } }))
+            r.sequence((r.capture(r.one_or_more(r.alpha())), r.parse("ws")))
+                .ast(quote!(|r, _| {
+                    if let ParseResult::List(mut items) = r {
+                        Ok(items.remove(0))
+                    } else {
+                        Ok(r)
+                    }
+                }))
         })
         // Whitespace - skip spaces
         .rule("ws", |r| r.skip(r.zero_or_more(r.ws())))

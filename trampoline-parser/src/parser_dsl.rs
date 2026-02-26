@@ -18,8 +18,8 @@
 //!     });
 //! ```
 
-use crate::ir::{CharClass, Combinator, InfixOp, PostfixOp, PrattDef, PrefixOp, TernaryOp};
 use crate::Assoc;
+use crate::ir::{CharClass, Combinator, InfixOp, PostfixOp, PrattDef, PrefixOp, TernaryOp};
 use proc_macro2::TokenStream;
 
 /// Builder for parser rules
@@ -409,7 +409,12 @@ impl PrattBuilder {
     /// Define a prefix operator with a pattern
     /// Example: `ops.prefix("-", 16, "|e| unary(e, Neg)")`
     /// Example: `ops.prefix(r.sequence((r.lit("-"), r.not_followed_by(r.lit("-")))), 16, "...")`
-    pub fn prefix(mut self, pattern: impl Into<Combinator>, precedence: u8, mapping: TokenStream) -> Self {
+    pub fn prefix(
+        mut self,
+        pattern: impl Into<Combinator>,
+        precedence: u8,
+        mapping: TokenStream,
+    ) -> Self {
         self.prefix_ops.push(PrefixOp {
             pattern: Box::new(pattern.into()),
             precedence,
@@ -453,7 +458,13 @@ impl PrattBuilder {
 
     /// Define an infix operator for a keyword (ensures not followed by identifier char)
     /// Example: `ops.infix_kw("in", 11, Assoc::Left, "|l, r| binary(l, r, In)")`
-    pub fn infix_kw(mut self, keyword: &str, precedence: u8, assoc: Assoc, mapping: TokenStream) -> Self {
+    pub fn infix_kw(
+        mut self,
+        keyword: &str,
+        precedence: u8,
+        assoc: Assoc,
+        mapping: TokenStream,
+    ) -> Self {
         self.infix_ops.push(InfixOp {
             pattern: Box::new(Combinator::Sequence(vec![
                 Combinator::Literal(keyword.to_string()),
@@ -528,7 +539,13 @@ impl PrattBuilder {
 
     /// Define an index expression postfix: obj[index]
     /// Example: `ops.postfix_index("[", "]", 18, "|obj, prop| member_computed(obj, prop)")`
-    pub fn postfix_index(mut self, open: &str, close: &str, precedence: u8, mapping: TokenStream) -> Self {
+    pub fn postfix_index(
+        mut self,
+        open: &str,
+        close: &str,
+        precedence: u8,
+        mapping: TokenStream,
+    ) -> Self {
         self.postfix_ops.push(PostfixOp::Index {
             open: Box::new(Combinator::Literal(open.to_string())),
             close: Box::new(Combinator::Literal(close.to_string())),
@@ -580,7 +597,13 @@ impl PrattBuilder {
 
     /// Define a ternary operator: cond ? then : else
     /// Example: `ops.ternary("?", ":", 3, "|c, t, f| conditional(c, t, f)")`
-    pub fn ternary(mut self, first: &str, second: &str, precedence: u8, mapping: TokenStream) -> Self {
+    pub fn ternary(
+        mut self,
+        first: &str,
+        second: &str,
+        precedence: u8,
+        mapping: TokenStream,
+    ) -> Self {
         self.ternary = Some(TernaryOp {
             first: Box::new(Combinator::Literal(first.to_string())),
             second: Box::new(Combinator::Literal(second.to_string())),
