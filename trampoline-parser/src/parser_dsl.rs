@@ -20,6 +20,7 @@
 
 use crate::ir::{CharClass, Combinator, InfixOp, PostfixOp, PrattDef, PrefixOp, TernaryOp};
 use crate::Assoc;
+use proc_macro2::TokenStream;
 
 /// Builder for parser rules
 #[derive(Debug)]
@@ -192,12 +193,12 @@ impl RuleBuilder {
 
 /// Extension trait for Combinator to add AST mapping
 pub trait CombinatorExt {
-    fn ast(self, mapping: &str) -> Combinator;
+    fn ast(self, mapping: TokenStream) -> Combinator;
 }
 
 impl CombinatorExt for Combinator {
     /// Apply AST mapping to this combinator
-    fn ast(self, mapping: &str) -> Combinator {
+    fn ast(self, mapping: TokenStream) -> Combinator {
         Combinator::Mapped {
             inner: Box::new(self),
             mapping: mapping.to_string(),
@@ -408,7 +409,7 @@ impl PrattBuilder {
     /// Define a prefix operator with a pattern
     /// Example: `ops.prefix("-", 16, "|e| unary(e, Neg)")`
     /// Example: `ops.prefix(r.sequence((r.lit("-"), r.not_followed_by(r.lit("-")))), 16, "...")`
-    pub fn prefix(mut self, pattern: impl Into<Combinator>, precedence: u8, mapping: &str) -> Self {
+    pub fn prefix(mut self, pattern: impl Into<Combinator>, precedence: u8, mapping: TokenStream) -> Self {
         self.prefix_ops.push(PrefixOp {
             pattern: Box::new(pattern.into()),
             precedence,
@@ -419,7 +420,7 @@ impl PrattBuilder {
 
     /// Define a prefix operator for a keyword (ensures not followed by identifier char)
     /// Example: `ops.prefix_kw("typeof", 16, "|e| unary(e, Typeof)")`
-    pub fn prefix_kw(mut self, keyword: &str, precedence: u8, mapping: &str) -> Self {
+    pub fn prefix_kw(mut self, keyword: &str, precedence: u8, mapping: TokenStream) -> Self {
         self.prefix_ops.push(PrefixOp {
             pattern: Box::new(Combinator::Sequence(vec![
                 Combinator::Literal(keyword.to_string()),
@@ -439,7 +440,7 @@ impl PrattBuilder {
         pattern: impl Into<Combinator>,
         precedence: u8,
         assoc: Assoc,
-        mapping: &str,
+        mapping: TokenStream,
     ) -> Self {
         self.infix_ops.push(InfixOp {
             pattern: Box::new(pattern.into()),
@@ -452,7 +453,7 @@ impl PrattBuilder {
 
     /// Define an infix operator for a keyword (ensures not followed by identifier char)
     /// Example: `ops.infix_kw("in", 11, Assoc::Left, "|l, r| binary(l, r, In)")`
-    pub fn infix_kw(mut self, keyword: &str, precedence: u8, assoc: Assoc, mapping: &str) -> Self {
+    pub fn infix_kw(mut self, keyword: &str, precedence: u8, assoc: Assoc, mapping: TokenStream) -> Self {
         self.infix_ops.push(InfixOp {
             pattern: Box::new(Combinator::Sequence(vec![
                 Combinator::Literal(keyword.to_string()),
@@ -471,7 +472,7 @@ impl PrattBuilder {
         mut self,
         pattern: impl Into<Combinator>,
         precedence: u8,
-        mapping: &str,
+        mapping: TokenStream,
     ) -> Self {
         self.postfix_ops.push(PostfixOp::Simple {
             pattern: Box::new(pattern.into()),
@@ -489,7 +490,7 @@ impl PrattBuilder {
         close: &str,
         separator: &str,
         precedence: u8,
-        mapping: &str,
+        mapping: TokenStream,
     ) -> Self {
         self.postfix_ops.push(PostfixOp::Call {
             open: Box::new(Combinator::Literal(open.to_string())),
@@ -512,7 +513,7 @@ impl PrattBuilder {
         separator: &str,
         arg_rule: &str,
         precedence: u8,
-        mapping: &str,
+        mapping: TokenStream,
     ) -> Self {
         self.postfix_ops.push(PostfixOp::Call {
             open: Box::new(Combinator::Literal(open.to_string())),
@@ -527,7 +528,7 @@ impl PrattBuilder {
 
     /// Define an index expression postfix: obj[index]
     /// Example: `ops.postfix_index("[", "]", 18, "|obj, prop| member_computed(obj, prop)")`
-    pub fn postfix_index(mut self, open: &str, close: &str, precedence: u8, mapping: &str) -> Self {
+    pub fn postfix_index(mut self, open: &str, close: &str, precedence: u8, mapping: TokenStream) -> Self {
         self.postfix_ops.push(PostfixOp::Index {
             open: Box::new(Combinator::Literal(open.to_string())),
             close: Box::new(Combinator::Literal(close.to_string())),
@@ -539,7 +540,7 @@ impl PrattBuilder {
 
     /// Define a member access postfix: obj.prop
     /// Example: `ops.postfix_member(".", 18, "|obj, prop| member(obj, prop)")`
-    pub fn postfix_member(mut self, literal: &str, precedence: u8, mapping: &str) -> Self {
+    pub fn postfix_member(mut self, literal: &str, precedence: u8, mapping: TokenStream) -> Self {
         self.postfix_ops.push(PostfixOp::Member {
             pattern: Box::new(Combinator::Literal(literal.to_string())),
             precedence,
@@ -555,7 +556,7 @@ impl PrattBuilder {
         mut self,
         pattern: Combinator,
         precedence: u8,
-        mapping: &str,
+        mapping: TokenStream,
     ) -> Self {
         self.postfix_ops.push(PostfixOp::Member {
             pattern: Box::new(pattern),
@@ -568,7 +569,7 @@ impl PrattBuilder {
     /// Define a rule-based postfix: parses another rule as the suffix
     /// Used for tagged template literals: tag`template`
     /// Example: `ops.postfix_rule("template_literal", 18, "|tag, template| tagged_template(tag, template)")`
-    pub fn postfix_rule(mut self, rule_name: &str, precedence: u8, mapping: &str) -> Self {
+    pub fn postfix_rule(mut self, rule_name: &str, precedence: u8, mapping: TokenStream) -> Self {
         self.postfix_ops.push(PostfixOp::Rule {
             rule_name: rule_name.to_string(),
             precedence,
@@ -579,7 +580,7 @@ impl PrattBuilder {
 
     /// Define a ternary operator: cond ? then : else
     /// Example: `ops.ternary("?", ":", 3, "|c, t, f| conditional(c, t, f)")`
-    pub fn ternary(mut self, first: &str, second: &str, precedence: u8, mapping: &str) -> Self {
+    pub fn ternary(mut self, first: &str, second: &str, precedence: u8, mapping: TokenStream) -> Self {
         self.ternary = Some(TernaryOp {
             first: Box::new(Combinator::Literal(first.to_string())),
             second: Box::new(Combinator::Literal(second.to_string())),
@@ -603,6 +604,7 @@ impl PrattBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use quote::quote;
 
     #[test]
     fn test_basic_combinators() {
@@ -666,9 +668,9 @@ mod tests {
         let builder = RuleBuilder::new("expr");
 
         let pratt = builder.pratt(builder.parse("primary"), |ops| {
-            ops.prefix("-", 10, "|e| Expr::Neg(e)")
-                .infix("+", 5, Assoc::Left, "|l, r| Expr::Add(l, r)")
-                .postfix("++", 15, "|e| Expr::PostInc(e)")
+            ops.prefix("-", 10, quote!(|e| Expr::Neg(e)))
+                .infix("+", 5, Assoc::Left, quote!(|l, r| Expr::Add(l, r)))
+                .postfix("++", 15, quote!(|e| Expr::PostInc(e)))
         });
 
         assert!(matches!(pratt, Combinator::Pratt(_)));
@@ -680,7 +682,7 @@ mod tests {
 
         let mapped = builder
             .sequence((builder.lit("a"), builder.lit("b")))
-            .ast("|(a, b)| Node { a, b }");
+            .ast(quote!(|(a, b)| Node { a, b }));
 
         assert!(matches!(mapped, Combinator::Mapped { .. }));
     }
