@@ -1,6 +1,7 @@
 //! Parser that uses Pratt expressions inside a separated list.
 //! This mimics JavaScript array syntax like [1 + 2, foo * bar]
 
+use quote::quote;
 use trampoline_parser::{Assoc, Combinator, CompiledGrammar, Grammar};
 
 /// Grammar with Pratt expressions inside arrays
@@ -15,9 +16,9 @@ pub fn grammar() -> CompiledGrammar {
         })
         .rule("expr", |r| {
             r.pratt(r.parse("primary"), |ops| {
-                ops.infix("+", 1, Assoc::Left, "|l, r, _s| Ok(l)")
-                    .infix("*", 2, Assoc::Left, "|l, r, _s| Ok(l)")
-                    .prefix("-", 3, "|e, _s| Ok(e)")
+                ops.infix("+", 1, Assoc::Left, quote!(|l, r, _s| Ok(l)))
+                    .infix("*", 2, Assoc::Left, quote!(|l, r, _s| Ok(l)))
+                    .prefix("-", 3, quote!(|e, _s| Ok(e)))
             })
         })
         // Primary is just an identifier or number
@@ -42,13 +43,13 @@ pub fn grammar_with_postfix() -> CompiledGrammar {
         })
         .rule("expr", |r| {
             r.pratt(r.parse("primary"), |ops| {
-                ops.infix("+", 1, Assoc::Left, "|l, r, _s| Ok(l)")
-                    .infix("*", 2, Assoc::Left, "|l, r, _s| Ok(l)")
-                    .prefix("-", 3, "|e, _s| Ok(e)")
+                ops.infix("+", 1, Assoc::Left, quote!(|l, r, _s| Ok(l)))
+                    .infix("*", 2, Assoc::Left, quote!(|l, r, _s| Ok(l)))
+                    .prefix("-", 3, quote!(|e, _s| Ok(e)))
                     // Postfix operators
-                    .postfix_call("(", ")", ",", 4, "|c, a, _s| Ok(c)")
-                    .postfix_member(".", 4, "|o, p, _s| Ok(o)")
-                    .postfix_index("[", "]", 4, "|o, e, _s| Ok(o)")
+                    .postfix_call("(", ")", ",", 4, quote!(|c, a, _s| Ok(c)))
+                    .postfix_member(".", 4, quote!(|o, p, _s| Ok(o)))
+                    .postfix_index("[", "]", 4, quote!(|o, e, _s| Ok(o)))
             })
         })
         // Primary is just an identifier or number
@@ -79,13 +80,13 @@ pub fn grammar_ts_like() -> CompiledGrammar {
         .rule("spread", |r| r.sequence((r.lit("..."), r.parse("expr"))))
         .rule("expr", |r| {
             r.pratt(r.parse("primary"), |ops| {
-                ops.infix("+", 1, Assoc::Left, "|l, r, _s| Ok(l)")
-                    .infix("*", 2, Assoc::Left, "|l, r, _s| Ok(l)")
-                    .prefix("-", 3, "|e, _s| Ok(e)")
+                ops.infix("+", 1, Assoc::Left, quote!(|l, r, _s| Ok(l)))
+                    .infix("*", 2, Assoc::Left, quote!(|l, r, _s| Ok(l)))
+                    .prefix("-", 3, quote!(|e, _s| Ok(e)))
                     // Postfix operators
-                    .postfix_call("(", ")", ",", 4, "|c, a, _s| Ok(c)")
-                    .postfix_member(".", 4, "|o, p, _s| Ok(o)")
-                    .postfix_index("[", "]", 4, "|o, e, _s| Ok(o)")
+                    .postfix_call("(", ")", ",", 4, quote!(|c, a, _s| Ok(c)))
+                    .postfix_member(".", 4, quote!(|o, p, _s| Ok(o)))
+                    .postfix_index("[", "]", 4, quote!(|o, e, _s| Ok(o)))
             })
         })
         .rule("primary", |r| {

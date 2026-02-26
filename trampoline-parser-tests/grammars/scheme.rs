@@ -7,6 +7,7 @@
 //! - Dotted pairs
 //! - Hash-prefixed disambiguation
 
+use quote::quote;
 use trampoline_parser::{CombinatorExt, CompiledGrammar, Grammar};
 
 pub fn grammar() -> CompiledGrammar {
@@ -14,7 +15,7 @@ pub fn grammar() -> CompiledGrammar {
         // Entry rule - program with whitespace
         .rule("program", |r| {
             r.sequence((r.parse("ws"), r.parse("datum"), r.parse("ws")))
-                .ast("|r, _| Ok(extract_datum(r))")
+                .ast(quote!(|r, _| Ok(extract_datum(r))))
         })
         // Main datum rule
         .rule("datum", |r| {
@@ -37,19 +38,19 @@ pub fn grammar() -> CompiledGrammar {
         })
         .rule("quote", |r| {
             r.sequence((r.char('\''), r.parse("datum")))
-                .ast("|r, _| Ok(build_quote(r))")
+                .ast(quote!(|r, _| Ok(build_quote(r))))
         })
         .rule("quasiquote", |r| {
             r.sequence((r.char('`'), r.parse("datum")))
-                .ast("|r, _| Ok(build_quasiquote(r))")
+                .ast(quote!(|r, _| Ok(build_quasiquote(r))))
         })
         .rule("unquote_splicing", |r| {
             r.sequence((r.lit(",@"), r.parse("datum")))
-                .ast("|r, _| Ok(build_unquote_splicing(r))")
+                .ast(quote!(|r, _| Ok(build_unquote_splicing(r))))
         })
         .rule("unquote", |r| {
             r.sequence((r.char(','), r.parse("datum")))
-                .ast("|r, _| Ok(build_unquote(r))")
+                .ast(quote!(|r, _| Ok(build_unquote(r))))
         })
         // === Lists ===
         // Factor out common prefix to avoid exponential backtracking
@@ -58,7 +59,7 @@ pub fn grammar() -> CompiledGrammar {
         })
         .rule("empty_list", |r| {
             r.sequence((r.char('('), r.parse("ws"), r.char(')')))
-                .ast("|r, _| Ok(build_empty_list(r))")
+                .ast(quote!(|r, _| Ok(build_empty_list(r))))
         })
         // Non-empty list: handles both proper (a b c) and dotted (a b . c)
         // The dotted tail is optional to avoid re-parsing the common prefix
@@ -70,7 +71,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.optional(r.parse("dotted_tail")),
                 r.char(')'),
             ))
-            .ast("|r, _| Ok(build_non_empty_list(r))")
+            .ast(quote!(|r, _| Ok(build_non_empty_list(r))))
         })
         .rule("dotted_tail", |r| {
             r.sequence((
@@ -89,7 +90,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.zero_or_more(r.sequence((r.parse("datum"), r.parse("ws")))),
                 r.char(')'),
             ))
-            .ast("|r, _| Ok(build_vector(r))")
+            .ast(quote!(|r, _| Ok(build_vector(r))))
         })
         // === Atoms ===
         .rule("atom", |r| {
@@ -105,15 +106,15 @@ pub fn grammar() -> CompiledGrammar {
         .rule("boolean", |r| {
             r.choice((
                 r.lit("#t")
-                    .ast("|_, _| Ok(ParseResult::Scheme(SchemeValue::Boolean(true)))"),
+                    .ast(quote!(|_, _| Ok(ParseResult::Scheme(SchemeValue::Boolean(true))))),
                 r.lit("#f")
-                    .ast("|_, _| Ok(ParseResult::Scheme(SchemeValue::Boolean(false)))"),
+                    .ast(quote!(|_, _| Ok(ParseResult::Scheme(SchemeValue::Boolean(false))))),
             ))
         })
         // Character: #\x, #\newline, #\space, #\tab
         .rule("character", |r| {
             r.sequence((r.lit("#\\"), r.parse("char_value")))
-                .ast("|r, _| Ok(build_character(r))")
+                .ast(quote!(|r, _| Ok(build_character(r))))
         })
         .rule("char_value", |r| {
             r.capture(r.choice((r.lit("newline"), r.lit("space"), r.lit("tab"), r.any_char())))
@@ -124,7 +125,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.optional(r.choice((r.char('+'), r.char('-')))),
                 r.parse("unsigned_number"),
             )))
-            .ast("|r, _| Ok(build_number(r))")
+            .ast(quote!(|r, _| Ok(build_number(r))))
         })
         .rule("unsigned_number", |r| {
             r.choice((r.parse("float_number"), r.parse("int_number")))
@@ -150,7 +151,7 @@ pub fn grammar() -> CompiledGrammar {
         // String: "..."
         .rule("string", |r| {
             r.sequence((r.char('"'), r.parse("string_chars"), r.char('"')))
-                .ast("|r, _| Ok(build_string(r))")
+                .ast(quote!(|r, _| Ok(build_string(r))))
         })
         .rule("string_chars", |r| {
             r.capture(r.zero_or_more(r.choice((
@@ -168,7 +169,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("normal_identifier"), // Try normal first (handles ->, +x, etc.)
                 r.parse("peculiar_identifier"), // Then standalone +, -, ...
             ))
-            .ast("|r, _| Ok(build_symbol(r))")
+            .ast(quote!(|r, _| Ok(build_symbol(r))))
         })
         // Peculiar identifiers: standalone +, -, ...
         // Only match when NOT followed by subsequent characters

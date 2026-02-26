@@ -1,5 +1,6 @@
 //! Parser for JSON.
 
+use quote::quote;
 use trampoline_parser::{CombinatorExt, CompiledGrammar, Grammar};
 
 pub fn grammar() -> CompiledGrammar {
@@ -7,7 +8,7 @@ pub fn grammar() -> CompiledGrammar {
         // Entry rule - value with optional whitespace
         .rule("json", |r| {
             r.sequence((r.parse("ws"), r.parse("value"), r.parse("ws")))
-                .ast("|r, _| Ok(extract_value(r))")
+                .ast(quote!(|r, _| Ok(extract_value(r))))
         })
         // JSON value: object, array, string, number, true, false, null
         .rule("value", |r| {
@@ -30,7 +31,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.lit("}"),
             ))
-            .ast("|r, _| Ok(build_object(r))")
+            .ast(quote!(|r, _| Ok(build_object(r))))
         })
         // Members: pair (, pair)*
         .rule("members", |r| {
@@ -45,7 +46,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.parse("value"),
             ))
-            .ast("|r, _| Ok(build_pair(r))")
+            .ast(quote!(|r, _| Ok(build_pair(r))))
         })
         // Comma with whitespace
         .rule("comma", |r| {
@@ -60,7 +61,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.lit("]"),
             ))
-            .ast("|r, _| Ok(build_array(r))")
+            .ast(quote!(|r, _| Ok(build_array(r))))
         })
         // Elements: value (, value)*
         .rule("elements", |r| {
@@ -69,7 +70,7 @@ pub fn grammar() -> CompiledGrammar {
         // String: " chars "
         .rule("string", |r| {
             r.sequence((r.lit("\""), r.parse("chars"), r.lit("\"")))
-                .ast("|r, _| Ok(build_string(r))")
+                .ast(quote!(|r, _| Ok(build_string(r))))
         })
         // Characters inside string
         .rule("chars", |r| {
@@ -106,7 +107,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.optional(r.parse("frac")),
                 r.optional(r.parse("exp")),
             )))
-            .ast("|r, _| Ok(build_number(r))")
+            .ast(quote!(|r, _| Ok(build_number(r))))
         })
         // Integer part
         .rule("int", |r| {
@@ -132,15 +133,15 @@ pub fn grammar() -> CompiledGrammar {
         // Literals
         .rule("true", |r| {
             r.lit("true")
-                .ast("|_, _| Ok(ParseResult::Json(JsonValue::Bool(true)))")
+                .ast(quote!(|_, _| Ok(ParseResult::Json(JsonValue::Bool(true)))))
         })
         .rule("false", |r| {
             r.lit("false")
-                .ast("|_, _| Ok(ParseResult::Json(JsonValue::Bool(false)))")
+                .ast(quote!(|_, _| Ok(ParseResult::Json(JsonValue::Bool(false)))))
         })
         .rule("null", |r| {
             r.lit("null")
-                .ast("|_, _| Ok(ParseResult::Json(JsonValue::Null))")
+                .ast(quote!(|_, _| Ok(ParseResult::Json(JsonValue::Null))))
         })
         // Whitespace
         .rule("ws", |r| {

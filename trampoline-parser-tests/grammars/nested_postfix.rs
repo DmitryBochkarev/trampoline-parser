@@ -2,6 +2,7 @@
 //! Mimics the TypeScript issue where postfix member access fails inside
 //! object literals that are inside parenthesized expressions.
 
+use quote::quote;
 use trampoline_parser::{Assoc, Combinator, CombinatorExt, CompiledGrammar, Grammar, RuleBuilder};
 
 /// Helper for operator with trailing whitespace
@@ -22,7 +23,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("assignment_expression"),
                 r.zero_or_more(r.sequence((op(r, ","), r.parse("assignment_expression")))),
             ))
-            .ast("|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(0)) } else { Ok(r) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(0)) } else { Ok(r) } }))
         })
         // Assignment expression - Pratt with MANY operators like TypeScript
         // NOTE: Wrapped in sequence to mimic TypeScript's structure
@@ -31,50 +32,50 @@ pub fn grammar() -> CompiledGrammar {
                 r.pratt(r.parse("primary"), |ops| {
                     ops
                         // Assignment operators
-                        .infix(ws_op(r, "="), 2, Assoc::Right, "|l, r, _| Ok(r)")
-                        .infix(ws_op(r, "+="), 2, Assoc::Right, "|l, r, _| Ok(r)")
-                        .infix(ws_op(r, "-="), 2, Assoc::Right, "|l, r, _| Ok(r)")
+                        .infix(ws_op(r, "="), 2, Assoc::Right, quote!(|l, r, _| Ok(r)))
+                        .infix(ws_op(r, "+="), 2, Assoc::Right, quote!(|l, r, _| Ok(r)))
+                        .infix(ws_op(r, "-="), 2, Assoc::Right, quote!(|l, r, _| Ok(r)))
                         // Logical operators
-                        .infix(ws_op(r, "||"), 4, Assoc::Left, "|l, r, _| Ok(l)")
-                        .infix(ws_op(r, "&&"), 5, Assoc::Left, "|l, r, _| Ok(l)")
+                        .infix(ws_op(r, "||"), 4, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                        .infix(ws_op(r, "&&"), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
                         // Comparison
-                        .infix(ws_op(r, "==="), 10, Assoc::Left, "|l, r, _| Ok(l)")
-                        .infix(ws_op(r, "!=="), 10, Assoc::Left, "|l, r, _| Ok(l)")
-                        .infix(ws_op(r, "=="), 10, Assoc::Left, "|l, r, _| Ok(l)")
-                        .infix(ws_op(r, "!="), 10, Assoc::Left, "|l, r, _| Ok(l)")
+                        .infix(ws_op(r, "==="), 10, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                        .infix(ws_op(r, "!=="), 10, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                        .infix(ws_op(r, "=="), 10, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                        .infix(ws_op(r, "!="), 10, Assoc::Left, quote!(|l, r, _| Ok(l)))
                         // Relational
-                        .infix(ws_op(r, "<="), 11, Assoc::Left, "|l, r, _| Ok(l)")
-                        .infix(ws_op(r, ">="), 11, Assoc::Left, "|l, r, _| Ok(l)")
-                        .infix(ws_op(r, "<"), 11, Assoc::Left, "|l, r, _| Ok(l)")
-                        .infix(ws_op(r, ">"), 11, Assoc::Left, "|l, r, _| Ok(l)")
+                        .infix(ws_op(r, "<="), 11, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                        .infix(ws_op(r, ">="), 11, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                        .infix(ws_op(r, "<"), 11, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                        .infix(ws_op(r, ">"), 11, Assoc::Left, quote!(|l, r, _| Ok(l)))
                         // Arithmetic
-                        .infix(ws_op(r, "+"), 13, Assoc::Left, "|l, r, _| Ok(l)")
-                        .infix(ws_op(r, "-"), 13, Assoc::Left, "|l, r, _| Ok(l)")
-                        .infix(ws_op(r, "*"), 14, Assoc::Left, "|l, r, _| Ok(l)")
-                        .infix(ws_op(r, "/"), 14, Assoc::Left, "|l, r, _| Ok(l)")
+                        .infix(ws_op(r, "+"), 13, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                        .infix(ws_op(r, "-"), 13, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                        .infix(ws_op(r, "*"), 14, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                        .infix(ws_op(r, "/"), 14, Assoc::Left, quote!(|l, r, _| Ok(l)))
                         // Prefix
-                        .prefix(ws_op(r, "-"), 16, "|e, _| Ok(e)")
-                        .prefix(ws_op(r, "+"), 16, "|e, _| Ok(e)")
-                        .prefix(ws_op(r, "!"), 16, "|e, _| Ok(e)")
+                        .prefix(ws_op(r, "-"), 16, quote!(|e, _| Ok(e)))
+                        .prefix(ws_op(r, "+"), 16, quote!(|e, _| Ok(e)))
+                        .prefix(ws_op(r, "!"), 16, quote!(|e, _| Ok(e)))
                         // Postfix
-                        .postfix("++", 17, "|e, _| Ok(e)")
-                        .postfix("--", 17, "|e, _| Ok(e)")
+                        .postfix("++", 17, quote!(|e, _| Ok(e)))
+                        .postfix("--", 17, quote!(|e, _| Ok(e)))
                         // Member access and call (highest precedence)
-                        .postfix_call("?.(", ")", ",", 18, "|c, a, _| Ok(c)")
-                        .postfix_call("(", ")", ",", 18, "|c, a, _| Ok(c)")
-                        .postfix_index("?.[", "]", 18, "|o, e, _| Ok(o)")
-                        .postfix_index("[", "]", 18, "|o, e, _| Ok(o)")
-                        .postfix_member("?.", 18, "|o, p, _| Ok(o)")
-                        .postfix_member(".", 18, "|o, p, _| Ok(o)")
+                        .postfix_call("?.(", ")", ",", 18, quote!(|c, a, _| Ok(c)))
+                        .postfix_call("(", ")", ",", 18, quote!(|c, a, _| Ok(c)))
+                        .postfix_index("?.[", "]", 18, quote!(|o, e, _| Ok(o)))
+                        .postfix_index("[", "]", 18, quote!(|o, e, _| Ok(o)))
+                        .postfix_member("?.", 18, quote!(|o, p, _| Ok(o)))
+                        .postfix_member(".", 18, quote!(|o, p, _| Ok(o)))
                 }),
                 r.parse("ws"),  // Like TypeScript's optional "as Type" suffix
             ))
-            .ast("|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(0)) } else { Ok(r) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(0)) } else { Ok(r) } }))
         })
         // Primary expression with leading ws (for after infix operators)
         .rule("primary", |r| {
             r.sequence((r.parse("ws"), r.parse("primary_inner")))
-                .ast("|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }")
+                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }))
         })
         // Primary inner - various expression types
         // NOTE: arrow_function before parenthesized to mimic TypeScript
@@ -127,7 +128,7 @@ pub fn grammar() -> CompiledGrammar {
         // Parenthesized expression - wraps expression in parens
         .rule("parenthesized", |r| {
             r.sequence((op(r, "("), r.parse("expression"), op(r, ")")))
-                .ast("|r, _| { if let ParseResult::List(mut items) = r { items.remove(1); Ok(items.remove(0)) } else { Ok(r) } }")
+                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { items.remove(1); Ok(items.remove(0)) } else { Ok(r) } }))
         })
         // Object expression: { properties }
         .rule("object_expression", |r| {
@@ -169,7 +170,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.capture(r.one_or_more(r.alpha())),
                 r.parse("ws"),
             ))
-            .ast("|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(0)) } else { Ok(r) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(0)) } else { Ok(r) } }))
         })
         // Whitespace - skip spaces
         .rule("ws", |r| r.skip(r.zero_or_more(r.ws())))

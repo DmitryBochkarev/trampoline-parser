@@ -7,6 +7,7 @@
 //! - Tables with mixed field types
 //! - Control flow structures
 
+use quote::quote;
 use trampoline_parser::{Assoc, CombinatorExt, CompiledGrammar, Grammar};
 
 pub fn grammar() -> CompiledGrammar {
@@ -24,7 +25,7 @@ pub fn grammar() -> CompiledGrammar {
             // items[0] = ws result (None due to skip)
             // items[1] = zero_or_more result: List of iterations
             // Each iteration is List([Stmt, ws])
-            .ast("|r, _| { if let ParseResult::List(items) = r { if let Some(ParseResult::List(iterations)) = items.into_iter().nth(1) { let stmts: Vec<Stmt> = iterations.into_iter().filter_map(|iter| { if let ParseResult::List(parts) = iter { parts.into_iter().find_map(|p| if let ParseResult::Stmt(s) = p { Some(s) } else { None }) } else { None } }).collect(); Ok(ParseResult::Stmts(stmts)) } else { Ok(ParseResult::Stmts(vec![])) } } else { Ok(ParseResult::Stmts(vec![])) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { if let Some(ParseResult::List(iterations)) = items.into_iter().nth(1) { let stmts: Vec<Stmt> = iterations.into_iter().filter_map(|iter| { if let ParseResult::List(parts) = iter { parts.into_iter().find_map(|p| if let ParseResult::Stmt(s) = p { Some(s) } else { None }) } else { None } }).collect(); Ok(ParseResult::Stmts(stmts)) } else { Ok(ParseResult::Stmts(vec![])) } } else { Ok(ParseResult::Stmts(vec![])) } }))
         })
 
         // Statements
@@ -54,7 +55,7 @@ pub fn grammar() -> CompiledGrammar {
                     r.parse("expr_list"),
                 ))),
             ))
-            .ast("|r, _| { if let ParseResult::List(parts) = r { let names = if let ParseResult::Names(n) = &parts[2] { n.clone() } else { vec![] }; let exprs = parts.get(4).and_then(|p| if let ParseResult::List(inner) = p { inner.get(2).and_then(|e| if let ParseResult::Exprs(es) = e { Some(es.clone()) } else { None }) } else { None }).unwrap_or_default(); Ok(ParseResult::Stmt(Stmt::Local(names, exprs))) } else { Ok(ParseResult::None) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(parts) = r { let names = if let ParseResult::Names(n) = &parts[2] { n.clone() } else { vec![] }; let exprs = parts.get(4).and_then(|p| if let ParseResult::List(inner) = p { inner.get(2).and_then(|e| if let ParseResult::Exprs(es) = e { Some(es.clone()) } else { None }) } else { None }).unwrap_or_default(); Ok(ParseResult::Stmt(Stmt::Local(names, exprs))) } else { Ok(ParseResult::None) } }))
         })
 
         // If statement: if expr then block {elseif expr then block} [else block] end
@@ -86,7 +87,7 @@ pub fn grammar() -> CompiledGrammar {
                 ))),
                 r.parse("kw_end"),
             ))
-            .ast("|r, _| Ok(ParseResult::Stmt(Stmt::If))")
+            .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::If))))
         })
 
         // While statement: while expr do block end
@@ -102,7 +103,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.parse("kw_end"),
             ))
-            .ast("|r, _| Ok(ParseResult::Stmt(Stmt::While))")
+            .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::While))))
         })
 
         // For statement: for name = expr, expr [, expr] do block end
@@ -132,7 +133,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.parse("kw_end"),
             ])
-            .ast("|r, _| Ok(ParseResult::Stmt(Stmt::For))")
+            .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::For))))
         })
 
         // Repeat statement: repeat block until expr
@@ -146,7 +147,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws1"),
                 r.parse("expr"),
             ))
-            .ast("|r, _| Ok(ParseResult::Stmt(Stmt::Repeat))")
+            .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::Repeat))))
         })
 
         // Function declaration: function name ( [params] ) block end
@@ -166,7 +167,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.parse("kw_end"),
             ])
-            .ast("|r, _| Ok(ParseResult::Stmt(Stmt::Function))")
+            .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::Function))))
         })
 
         // Return statement: return [expr_list]
@@ -178,7 +179,7 @@ pub fn grammar() -> CompiledGrammar {
                     r.parse("expr_list"),
                 ))),
             ))
-            .ast("|r, _| Ok(ParseResult::Stmt(Stmt::Return))")
+            .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::Return))))
         })
 
         // Assignment or function call (disambiguated by context)
@@ -192,7 +193,7 @@ pub fn grammar() -> CompiledGrammar {
                     r.parse("expr_list"),
                 ))),
             ))
-            .ast("|r, _| Ok(ParseResult::Stmt(Stmt::AssignOrCall))")
+            .ast(quote!(|r, _| Ok(ParseResult::Stmt(Stmt::AssignOrCall))))
         })
 
         // Block: sequence of statements (used inside control structures)
@@ -201,7 +202,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("statement"),
                 r.parse("ws"),
             )))
-            .ast("|_, _| Ok(ParseResult::None)")
+            .ast(quote!(|_, _| Ok(ParseResult::None)))
         })
 
         // Expression using Pratt parsing - infix/postfix only
@@ -211,39 +212,39 @@ pub fn grammar() -> CompiledGrammar {
             r.pratt(r.parse("unary"), |ops| {
                 ops
                     // Postfix operators (highest binding)
-                    .postfix_call("(", ")", ",", 18, "|callee, args, _| Ok(call_expr(callee, args))")
-                    .postfix_index("[", "]", 18, "|obj, idx, _| Ok(make_index(obj, idx))")
+                    .postfix_call("(", ")", ",", 18, quote!(|callee, args, _| Ok(call_expr(callee, args))))
+                    .postfix_index("[", "]", 18, quote!(|obj, idx, _| Ok(make_index(obj, idx))))
                     // Use pattern to prevent matching ".." as member access
-                    .postfix_member_pattern(r.sequence((r.lit("."), r.not_followed_by(r.char('.')))), 18, "|obj, prop, _| Ok(member_expr(obj, prop))")
+                    .postfix_member_pattern(r.sequence((r.lit("."), r.not_followed_by(r.char('.')))), 18, quote!(|obj, prop, _| Ok(member_expr(obj, prop))))
 
                     // Power (right-associative, very high precedence)
-                    .infix(r.sequence((r.parse("ws"), r.lit("^"))), 12, Assoc::Right, "|l, r, _| Ok(binary_expr(l, r, BinOp::Pow))")
+                    .infix(r.sequence((r.parse("ws"), r.lit("^"))), 12, Assoc::Right, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Pow))))
 
                     // Multiplicative
-                    .infix(r.sequence((r.parse("ws"), r.lit("*"))), 10, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::Mul))")
-                    .infix(r.sequence((r.parse("ws"), r.lit("//"))), 10, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::FloorDiv))")
-                    .infix(r.sequence((r.parse("ws"), r.lit("/"))), 10, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::Div))")
-                    .infix(r.sequence((r.parse("ws"), r.lit("%"))), 10, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::Mod))")
+                    .infix(r.sequence((r.parse("ws"), r.lit("*"))), 10, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Mul))))
+                    .infix(r.sequence((r.parse("ws"), r.lit("//"))), 10, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::FloorDiv))))
+                    .infix(r.sequence((r.parse("ws"), r.lit("/"))), 10, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Div))))
+                    .infix(r.sequence((r.parse("ws"), r.lit("%"))), 10, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Mod))))
 
                     // Additive
-                    .infix(r.sequence((r.parse("ws"), r.lit("+"))), 9, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::Add))")
+                    .infix(r.sequence((r.parse("ws"), r.lit("+"))), 9, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Add))))
                     // Use pattern to ensure "-" isn't followed by "-" (which would be a comment)
-                    .infix(r.sequence((r.parse("ws"), r.lit("-"), r.not_followed_by(r.lit("-")))), 9, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::Sub))")
+                    .infix(r.sequence((r.parse("ws"), r.lit("-"), r.not_followed_by(r.lit("-")))), 9, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Sub))))
 
                     // String concatenation (right-associative)
-                    .infix(r.sequence((r.parse("ws"), r.lit(".."))), 8, Assoc::Right, "|l, r, _| Ok(binary_expr(l, r, BinOp::Concat))")
+                    .infix(r.sequence((r.parse("ws"), r.lit(".."))), 8, Assoc::Right, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Concat))))
 
                     // Comparison
-                    .infix(r.sequence((r.parse("ws"), r.lit("=="))), 4, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::Eq))")
-                    .infix(r.sequence((r.parse("ws"), r.lit("~="))), 4, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::NotEq))")
-                    .infix(r.sequence((r.parse("ws"), r.lit("<="))), 4, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::Le))")
-                    .infix(r.sequence((r.parse("ws"), r.lit(">="))), 4, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::Ge))")
-                    .infix(r.sequence((r.parse("ws"), r.lit("<"))), 4, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::Lt))")
-                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 4, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::Gt))")
+                    .infix(r.sequence((r.parse("ws"), r.lit("=="))), 4, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Eq))))
+                    .infix(r.sequence((r.parse("ws"), r.lit("~="))), 4, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::NotEq))))
+                    .infix(r.sequence((r.parse("ws"), r.lit("<="))), 4, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Le))))
+                    .infix(r.sequence((r.parse("ws"), r.lit(">="))), 4, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Ge))))
+                    .infix(r.sequence((r.parse("ws"), r.lit("<"))), 4, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Lt))))
+                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 4, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Gt))))
 
                     // Logical (keyword operators - include ws in pattern)
-                    .infix(r.sequence((r.parse("ws"), r.lit("and"), r.not_followed_by(r.ident_cont()))), 3, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::And))")
-                    .infix(r.sequence((r.parse("ws"), r.lit("or"), r.not_followed_by(r.ident_cont()))), 2, Assoc::Left, "|l, r, _| Ok(binary_expr(l, r, BinOp::Or))")
+                    .infix(r.sequence((r.parse("ws"), r.lit("and"), r.not_followed_by(r.ident_cont()))), 3, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::And))))
+                    .infix(r.sequence((r.parse("ws"), r.lit("or"), r.not_followed_by(r.ident_cont()))), 2, Assoc::Left, quote!(|l, r, _| Ok(binary_expr(l, r, BinOp::Or))))
             })
         })
 
@@ -251,7 +252,7 @@ pub fn grammar() -> CompiledGrammar {
         // This allows ws to be consumed before checking for prefix ops
         .rule("unary", |r| {
             r.sequence((r.parse("ws"), r.parse("unary_inner"), r.parse("ws")))
-                .ast("|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(1)) } else { Ok(r) } }")
+                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(1)) } else { Ok(r) } }))
         })
 
         .rule("unary_inner", |r| {
@@ -269,7 +270,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.not_followed_by(r.ident_cont()),
                 r.parse("unary"),  // recursive - handles ws and more prefixes
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { let e = items.into_iter().last().unwrap_or(ParseResult::None); Ok(unary_expr(e, UnOp::Not)) } else { Ok(r) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let e = items.into_iter().last().unwrap_or(ParseResult::None); Ok(unary_expr(e, UnOp::Not)) } else { Ok(r) } }))
         })
 
         .rule("prefix_neg", |r| {
@@ -278,7 +279,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.not_followed_by(r.lit("-")),  // not a comment
                 r.parse("unary"),
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { let e = items.into_iter().last().unwrap_or(ParseResult::None); Ok(unary_expr(e, UnOp::Neg)) } else { Ok(r) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let e = items.into_iter().last().unwrap_or(ParseResult::None); Ok(unary_expr(e, UnOp::Neg)) } else { Ok(r) } }))
         })
 
         .rule("prefix_len", |r| {
@@ -286,7 +287,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.lit("#"),
                 r.parse("unary"),
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { let e = items.into_iter().last().unwrap_or(ParseResult::None); Ok(unary_expr(e, UnOp::Len)) } else { Ok(r) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let e = items.into_iter().last().unwrap_or(ParseResult::None); Ok(unary_expr(e, UnOp::Len)) } else { Ok(r) } }))
         })
 
         // Primary expression
@@ -308,10 +309,10 @@ pub fn grammar() -> CompiledGrammar {
         .rule("prefix_expr", |r| {
             r.pratt(r.parse("prefix_primary"), |ops| {
                 ops
-                    .postfix_call("(", ")", ",", 18, "|callee, args, _| Ok(call_expr(callee, args))")
-                    .postfix_index("[", "]", 18, "|obj, idx, _| Ok(make_index(obj, idx))")
+                    .postfix_call("(", ")", ",", 18, quote!(|callee, args, _| Ok(call_expr(callee, args))))
+                    .postfix_index("[", "]", 18, quote!(|obj, idx, _| Ok(make_index(obj, idx))))
                     // Use pattern to prevent matching ".." as member access
-                    .postfix_member_pattern(r.sequence((r.lit("."), r.not_followed_by(r.char('.')))), 18, "|obj, prop, _| Ok(member_expr(obj, prop))")
+                    .postfix_member_pattern(r.sequence((r.lit("."), r.not_followed_by(r.char('.')))), 18, quote!(|obj, prop, _| Ok(member_expr(obj, prop))))
             })
         })
 
@@ -331,7 +332,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.lit(")"),
             ))
-            .ast("|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(2)) } else { Ok(r) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(2)) } else { Ok(r) } }))
         })
 
         // Function expression: function ( [params] ) block end
@@ -349,7 +350,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.parse("kw_end"),
             ))
-            .ast("|_, _| Ok(ParseResult::Expr(Expr::Function))")
+            .ast(quote!(|_, _| Ok(ParseResult::Expr(Expr::Function))))
         })
 
         // Table constructor
@@ -361,7 +362,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.lit("}"),
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { let fields = items.get(2).and_then(|f| if let ParseResult::Fields(fs) = f { Some(fs.clone()) } else { None }).unwrap_or_default(); Ok(ParseResult::Expr(Expr::Table(fields))) } else { Ok(ParseResult::Expr(Expr::Table(vec![]))) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let fields = items.get(2).and_then(|f| if let ParseResult::Fields(fs) = f { Some(fs.clone()) } else { None }).unwrap_or_default(); Ok(ParseResult::Expr(Expr::Table(fields))) } else { Ok(ParseResult::Expr(Expr::Table(vec![]))) } }))
         })
 
         // Field list: field { fieldsep field } [fieldsep]
@@ -374,7 +375,7 @@ pub fn grammar() -> CompiledGrammar {
                 ))),
                 r.optional(r.parse("field_sep")),
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { let mut fields = vec![]; if let ParseResult::Field(f) = &items[0] { fields.push(f.clone()); } if let ParseResult::List(rest) = &items[1] { for item in rest.iter() { if let ParseResult::List(pair) = item { if let Some(ParseResult::Field(f)) = pair.get(1) { fields.push(f.clone()); } } } } Ok(ParseResult::Fields(fields)) } else { Ok(ParseResult::Fields(vec![])) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let mut fields = vec![]; if let ParseResult::Field(f) = &items[0] { fields.push(f.clone()); } if let ParseResult::List(rest) = &items[1] { for item in rest.iter() { if let ParseResult::List(pair) = item { if let Some(ParseResult::Field(f)) = pair.get(1) { fields.push(f.clone()); } } } } Ok(ParseResult::Fields(fields)) } else { Ok(ParseResult::Fields(vec![])) } }))
         })
 
         // Field: [expr] = expr | name = expr | expr
@@ -398,7 +399,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.parse("expr"),
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { let key = to_expr(items.get(2).cloned().unwrap_or(ParseResult::None)); let val = to_expr(items.get(8).cloned().unwrap_or(ParseResult::None)); Ok(ParseResult::Field(Field::Computed(key, val))) } else { Ok(ParseResult::None) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let key = to_expr(items.get(2).cloned().unwrap_or(ParseResult::None)); let val = to_expr(items.get(8).cloned().unwrap_or(ParseResult::None)); Ok(ParseResult::Field(Field::Computed(key, val))) } else { Ok(ParseResult::None) } }))
         })
 
         .rule("named_field", |r| {
@@ -409,12 +410,12 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.parse("expr"),
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { let name = if let ParseResult::Expr(Expr::Ident(n)) = &items[0] { n.clone() } else { String::new() }; let val = to_expr(items.get(4).cloned().unwrap_or(ParseResult::None)); Ok(ParseResult::Field(Field::Named(name, val))) } else { Ok(ParseResult::None) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let name = if let ParseResult::Expr(Expr::Ident(n)) = &items[0] { n.clone() } else { String::new() }; let val = to_expr(items.get(4).cloned().unwrap_or(ParseResult::None)); Ok(ParseResult::Field(Field::Named(name, val))) } else { Ok(ParseResult::None) } }))
         })
 
         .rule("array_field", |r| {
             r.parse("expr")
-            .ast("|r, _| { let e = to_expr(r); Ok(ParseResult::Field(Field::Array(e))) }")
+            .ast(quote!(|r, _| { let e = to_expr(r); Ok(ParseResult::Field(Field::Array(e))) }))
         })
 
         .rule("field_sep", |r| {
@@ -431,7 +432,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.lit("nil"),
                 r.not_followed_by(r.ident_cont()),
             ))
-            .ast("|_, _| Ok(ParseResult::Expr(Expr::Nil))")
+            .ast(quote!(|_, _| Ok(ParseResult::Expr(Expr::Nil))))
         })
 
         .rule("true", |r| {
@@ -439,7 +440,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.lit("true"),
                 r.not_followed_by(r.ident_cont()),
             ))
-            .ast("|_, _| Ok(ParseResult::Expr(Expr::Bool(true)))")
+            .ast(quote!(|_, _| Ok(ParseResult::Expr(Expr::Bool(true)))))
         })
 
         .rule("false", |r| {
@@ -447,7 +448,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.lit("false"),
                 r.not_followed_by(r.ident_cont()),
             ))
-            .ast("|_, _| Ok(ParseResult::Expr(Expr::Bool(false)))")
+            .ast(quote!(|_, _| Ok(ParseResult::Expr(Expr::Bool(false)))))
         })
 
         // Number: integer, float, hex, scientific
@@ -457,7 +458,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("float_number"),
                 r.parse("int_number"),
             )))
-            .ast("|r, _| { if let ParseResult::Text(s, _) = r { Ok(ParseResult::Expr(Expr::Number(s))) } else { Ok(ParseResult::None) } }")
+            .ast(quote!(|r, _| { if let ParseResult::Text(s, _) = r { Ok(ParseResult::Expr(Expr::Number(s))) } else { Ok(ParseResult::None) } }))
         })
 
         .rule("hex_number", |r| {
@@ -515,7 +516,7 @@ pub fn grammar() -> CompiledGrammar {
                 )))),
                 r.char('"'),
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { if let ParseResult::Text(s, _) = &items[1] { Ok(ParseResult::Expr(Expr::String(s.clone()))) } else { Ok(ParseResult::Expr(Expr::String(String::new()))) } } else { Ok(ParseResult::None) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { if let ParseResult::Text(s, _) = &items[1] { Ok(ParseResult::Expr(Expr::String(s.clone()))) } else { Ok(ParseResult::Expr(Expr::String(String::new()))) } } else { Ok(ParseResult::None) } }))
         })
 
         .rule("single_string", |r| {
@@ -530,7 +531,7 @@ pub fn grammar() -> CompiledGrammar {
                 )))),
                 r.char('\''),
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { if let ParseResult::Text(s, _) = &items[1] { Ok(ParseResult::Expr(Expr::String(s.clone()))) } else { Ok(ParseResult::Expr(Expr::String(String::new()))) } } else { Ok(ParseResult::None) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { if let ParseResult::Text(s, _) = &items[1] { Ok(ParseResult::Expr(Expr::String(s.clone()))) } else { Ok(ParseResult::Expr(Expr::String(String::new()))) } } else { Ok(ParseResult::None) } }))
         })
 
         .rule("raw_string", |r| {
@@ -542,7 +543,7 @@ pub fn grammar() -> CompiledGrammar {
                 )))),
                 r.lit("]]"),
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { if let ParseResult::Text(s, _) = &items[1] { Ok(ParseResult::Expr(Expr::String(s.clone()))) } else { Ok(ParseResult::Expr(Expr::String(String::new()))) } } else { Ok(ParseResult::None) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { if let ParseResult::Text(s, _) = &items[1] { Ok(ParseResult::Expr(Expr::String(s.clone()))) } else { Ok(ParseResult::Expr(Expr::String(String::new()))) } } else { Ok(ParseResult::None) } }))
         })
 
         // Identifier (not a keyword)
@@ -554,7 +555,7 @@ pub fn grammar() -> CompiledGrammar {
                     r.zero_or_more(r.choice((r.alpha_num(), r.char('_')))),
                 ))),
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { if let ParseResult::Text(s, _) = &items[1] { Ok(ParseResult::Expr(Expr::Ident(s.clone()))) } else { Ok(ParseResult::None) } } else { Ok(ParseResult::None) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { if let ParseResult::Text(s, _) = &items[1] { Ok(ParseResult::Expr(Expr::Ident(s.clone()))) } else { Ok(ParseResult::None) } } else { Ok(ParseResult::None) } }))
         })
 
         // Keywords (for negative lookahead)
@@ -605,7 +606,7 @@ pub fn grammar() -> CompiledGrammar {
                     r.parse("identifier"),
                 ))),
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { let mut names = vec![]; if let ParseResult::Expr(Expr::Ident(n)) = &items[0] { names.push(n.clone()); } if let ParseResult::List(rest) = &items[1] { for item in rest.iter() { if let ParseResult::List(parts) = item { if let Some(ParseResult::Expr(Expr::Ident(n))) = parts.get(3) { names.push(n.clone()); } } } } Ok(ParseResult::Names(names)) } else { Ok(ParseResult::Names(vec![])) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let mut names = vec![]; if let ParseResult::Expr(Expr::Ident(n)) = &items[0] { names.push(n.clone()); } if let ParseResult::List(rest) = &items[1] { for item in rest.iter() { if let ParseResult::List(parts) = item { if let Some(ParseResult::Expr(Expr::Ident(n))) = parts.get(3) { names.push(n.clone()); } } } } Ok(ParseResult::Names(names)) } else { Ok(ParseResult::Names(vec![])) } }))
         })
 
         .rule("expr_list", |r| {
@@ -618,7 +619,7 @@ pub fn grammar() -> CompiledGrammar {
                     r.parse("expr"),
                 ))),
             ))
-            .ast("|r, _| { if let ParseResult::List(items) = r { let mut exprs = vec![to_expr(items[0].clone())]; if let ParseResult::List(rest) = &items[1] { for item in rest.iter() { if let ParseResult::List(parts) = item { if let Some(e) = parts.get(3) { exprs.push(to_expr(e.clone())); } } } } Ok(ParseResult::Exprs(exprs)) } else { Ok(ParseResult::Exprs(vec![])) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(items) = r { let mut exprs = vec![to_expr(items[0].clone())]; if let ParseResult::List(rest) = &items[1] { for item in rest.iter() { if let ParseResult::List(parts) = item { if let Some(e) = parts.get(3) { exprs.push(to_expr(e.clone())); } } } } Ok(ParseResult::Exprs(exprs)) } else { Ok(ParseResult::Exprs(vec![])) } }))
         })
 
         .rule("param_list", |r| {

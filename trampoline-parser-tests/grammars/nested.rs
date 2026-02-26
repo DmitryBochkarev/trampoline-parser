@@ -1,12 +1,13 @@
 //! Parser for nested parentheses.
 
+use quote::quote;
 use trampoline_parser::{Assoc, CompiledGrammar, Grammar};
 
 pub fn grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("expr", |r| {
             r.pratt(r.parse("primary"), |ops| {
-                ops.infix("+", 1, Assoc::Left, "|l, r, _| Ok(binary(l, r))")
+                ops.infix("+", 1, Assoc::Left, quote!(|l, r, _| Ok(binary(l, r))))
             })
         })
         .rule("primary", |r| {

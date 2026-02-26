@@ -4,6 +4,7 @@
 //! - `bad_grammar`: Has exponential backtracking due to shared prefix
 //! - `good_grammar`: Factored prefix eliminates backtracking
 
+use quote::quote;
 use trampoline_parser::{CombinatorExt, CompiledGrammar, Grammar};
 
 /// Grammar with exponential backtracking.
@@ -17,7 +18,7 @@ pub fn bad_grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("program", |r| {
             r.sequence((r.parse("ws"), r.parse("list"), r.parse("ws")))
-                .ast("|r, _| { if let ParseResult::List(items) = r { Ok(items.into_iter().nth(1).unwrap_or(ParseResult::None)) } else { Ok(r) } }")
+                .ast(quote!(|r, _| { if let ParseResult::List(items) = r { Ok(items.into_iter().nth(1).unwrap_or(ParseResult::None)) } else { Ok(r) } }))
         })
         .rule("list", |r| {
             r.choice((
@@ -28,7 +29,7 @@ pub fn bad_grammar() -> CompiledGrammar {
         })
         .rule("empty_list", |r| {
             r.sequence((r.char('('), r.parse("ws"), r.char(')')))
-                .ast("|_, _| Ok(ParseResult::Text(\"()\".to_string(), Span::default()))")
+                .ast(quote!(|_, _| Ok(ParseResult::Text("()".to_string(), Span::default()))))
         })
         // Dotted list: (a b . c)
         .rule("dotted_list", |r| {
@@ -42,7 +43,7 @@ pub fn bad_grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.char(')'),
             ))
-            .ast("|_, _| Ok(ParseResult::Text(\"dotted\".to_string(), Span::default()))")
+            .ast(quote!(|_, _| Ok(ParseResult::Text("dotted".to_string(), Span::default()))))
         })
         // Proper list: (a b c) - shares prefix with dotted_list!
         .rule("proper_list", |r| {
@@ -52,7 +53,7 @@ pub fn bad_grammar() -> CompiledGrammar {
                 r.one_or_more(r.sequence((r.parse("datum"), r.parse("ws")))),
                 r.char(')'),
             ))
-            .ast("|_, _| Ok(ParseResult::Text(\"proper\".to_string(), Span::default()))")
+            .ast(quote!(|_, _| Ok(ParseResult::Text("proper".to_string(), Span::default()))))
         })
         .rule("datum", |r| {
             r.choice((
@@ -79,7 +80,7 @@ pub fn good_grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("program", |r| {
             r.sequence((r.parse("ws"), r.parse("list"), r.parse("ws")))
-                .ast("|r, _| { if let ParseResult::List(items) = r { Ok(items.into_iter().nth(1).unwrap_or(ParseResult::None)) } else { Ok(r) } }")
+                .ast(quote!(|r, _| { if let ParseResult::List(items) = r { Ok(items.into_iter().nth(1).unwrap_or(ParseResult::None)) } else { Ok(r) } }))
         })
         .rule("list", |r| {
             r.choice((
@@ -89,7 +90,7 @@ pub fn good_grammar() -> CompiledGrammar {
         })
         .rule("empty_list", |r| {
             r.sequence((r.char('('), r.parse("ws"), r.char(')')))
-                .ast("|_, _| Ok(ParseResult::Text(\"()\".to_string(), Span::default()))")
+                .ast(quote!(|_, _| Ok(ParseResult::Text("()".to_string(), Span::default()))))
         })
         // Non-empty list: handles both proper (a b c) and dotted (a b . c)
         // The dotted tail is OPTIONAL - no re-parsing needed
@@ -101,7 +102,7 @@ pub fn good_grammar() -> CompiledGrammar {
                 r.optional(r.parse("dotted_tail")),
                 r.char(')'),
             ))
-            .ast("|_, _| Ok(ParseResult::Text(\"list\".to_string(), Span::default()))")
+            .ast(quote!(|_, _| Ok(ParseResult::Text("list".to_string(), Span::default()))))
         })
         .rule("dotted_tail", |r| {
             r.sequence((

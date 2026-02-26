@@ -1,15 +1,16 @@
 //! Parser for expressions with right-associative operators.
 
+use quote::quote;
 use trampoline_parser::{Assoc, CompiledGrammar, Grammar};
 
 pub fn grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("expr", |r| {
             r.pratt(r.parse("number"), |ops| {
-                ops.infix("+", 1, Assoc::Left, "|l, r, _| Ok(binary(l, r, Op::Add))")
-                    .infix("-", 1, Assoc::Left, "|l, r, _| Ok(binary(l, r, Op::Sub))")
-                    .infix("*", 2, Assoc::Left, "|l, r, _| Ok(binary(l, r, Op::Mul))")
-                    .infix("^", 3, Assoc::Right, "|l, r, _| Ok(binary(l, r, Op::Pow))")
+                ops.infix("+", 1, Assoc::Left, quote!(|l, r, _| Ok(binary(l, r, Op::Add))))
+                    .infix("-", 1, Assoc::Left, quote!(|l, r, _| Ok(binary(l, r, Op::Sub))))
+                    .infix("*", 2, Assoc::Left, quote!(|l, r, _| Ok(binary(l, r, Op::Mul))))
+                    .infix("^", 3, Assoc::Right, quote!(|l, r, _| Ok(binary(l, r, Op::Pow))))
             })
         })
         .rule("number", |r| r.capture(r.one_or_more(r.digit())))

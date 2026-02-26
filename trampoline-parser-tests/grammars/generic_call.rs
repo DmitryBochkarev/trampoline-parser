@@ -8,6 +8,7 @@
 //! - `bad_grammar`: Has exponential backtracking due to naive generic call matching
 //! - `good_grammar`: Uses simpler type arguments to avoid exponential backtracking
 
+use quote::quote;
 use trampoline_parser::{Assoc, CombinatorExt, CompiledGrammar, Grammar, RuleBuilder};
 
 /// Helper for operators with whitespace
@@ -28,14 +29,14 @@ pub fn bad_grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("expr", |r| {
             r.pratt(r.parse("primary"), |ops| {
-                ops.infix(r.sequence((r.parse("ws"), r.lit("<"))), 5, Assoc::Left, "|l, r, _| Ok(l)")
-                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 5, Assoc::Left, "|l, r, _| Ok(l)")
-                    .postfix_call("(", ")", ",", 10, "|c, a, _| Ok(c)")
+                ops.infix(r.sequence((r.parse("ws"), r.lit("<"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                    .postfix_call("(", ")", ",", 10, quote!(|c, a, _| Ok(c)))
             })
         })
         .rule("primary", |r| {
             r.sequence((r.parse("ws"), r.parse("primary_inner")))
-                .ast("|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }")
+                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }))
         })
         .rule("primary_inner", |r| {
             r.choice((
@@ -92,14 +93,14 @@ pub fn good_grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("expr", |r| {
             r.pratt(r.parse("primary"), |ops| {
-                ops.infix(r.sequence((r.parse("ws"), r.lit("<"))), 5, Assoc::Left, "|l, r, _| Ok(l)")
-                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 5, Assoc::Left, "|l, r, _| Ok(l)")
-                    .postfix_call("(", ")", ",", 10, "|c, a, _| Ok(c)")
+                ops.infix(r.sequence((r.parse("ws"), r.lit("<"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                    .postfix_call("(", ")", ",", 10, quote!(|c, a, _| Ok(c)))
             })
         })
         .rule("primary", |r| {
             r.sequence((r.parse("ws"), r.parse("primary_inner")))
-                .ast("|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }")
+                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }))
         })
         .rule("primary_inner", |r| {
             r.choice((
@@ -140,14 +141,14 @@ pub fn auto_memoized_grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("expr", |r| {
             r.pratt(r.parse("primary"), |ops| {
-                ops.infix(r.sequence((r.parse("ws"), r.lit("<"))), 5, Assoc::Left, "|l, r, _| Ok(l)")
-                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 5, Assoc::Left, "|l, r, _| Ok(l)")
-                    .postfix_call("(", ")", ",", 10, "|c, a, _| Ok(c)")
+                ops.infix(r.sequence((r.parse("ws"), r.lit("<"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                    .postfix_call("(", ")", ",", 10, quote!(|c, a, _| Ok(c)))
             })
         })
         .rule("primary", |r| {
             r.sequence((r.parse("ws"), r.parse("primary_inner")))
-                .ast("|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }")
+                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }))
         })
         .rule("primary_inner", |r| {
             r.choice((
@@ -203,14 +204,14 @@ pub fn memoized_grammar() -> CompiledGrammar {
     Grammar::new()
         .rule("expr", |r| {
             r.pratt(r.parse("primary"), |ops| {
-                ops.infix(r.sequence((r.parse("ws"), r.lit("<"))), 5, Assoc::Left, "|l, r, _| Ok(l)")
-                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 5, Assoc::Left, "|l, r, _| Ok(l)")
-                    .postfix_call("(", ")", ",", 10, "|c, a, _| Ok(c)")
+                ops.infix(r.sequence((r.parse("ws"), r.lit("<"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                    .infix(r.sequence((r.parse("ws"), r.lit(">"))), 5, Assoc::Left, quote!(|l, r, _| Ok(l)))
+                    .postfix_call("(", ")", ",", 10, quote!(|c, a, _| Ok(c)))
             })
         })
         .rule("primary", |r| {
             r.sequence((r.parse("ws"), r.parse("primary_inner")))
-                .ast("|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }")
+                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.pop().unwrap_or(ParseResult::None)) } else { Ok(r) } }))
         })
         .rule("primary_inner", |r| {
             r.choice((

@@ -1,5 +1,6 @@
 //! Parser for expressions with postfix operators (call, index, member, simple).
 
+use quote::quote;
 use trampoline_parser::{Assoc, CombinatorExt, CompiledGrammar, Grammar};
 
 pub fn grammar() -> CompiledGrammar {
@@ -13,21 +14,21 @@ pub fn grammar() -> CompiledGrammar {
             r.pratt(r.parse("operand"), |ops| {
                 ops
                     // Postfix operators (highest precedence for binding)
-                    .postfix_call("(", ")", ",", 18, "|callee, args, _| Ok(call(callee, args))")
-                    .postfix_index("[", "]", 18, "|obj, idx, _| Ok(index(obj, idx))")
-                    .postfix_member(".", 18, "|obj, prop, _| Ok(member(obj, prop))")
-                    .postfix("++", 17, "|e, _| Ok(postinc(e))")
-                    .postfix("--", 17, "|e, _| Ok(postdec(e))")
+                    .postfix_call("(", ")", ",", 18, quote!(|callee, args, _| Ok(call(callee, args))))
+                    .postfix_index("[", "]", 18, quote!(|obj, idx, _| Ok(index(obj, idx))))
+                    .postfix_member(".", 18, quote!(|obj, prop, _| Ok(member(obj, prop))))
+                    .postfix("++", 17, quote!(|e, _| Ok(postinc(e))))
+                    .postfix("--", 17, quote!(|e, _| Ok(postdec(e))))
                     // Binary operators - use patterns with leading ws rule
                     // This enables "a.x * b" to work: after ".x" postfix, ws consumes " " before "*"
-                    .infix(r.sequence((r.parse("ws"), r.lit("+"))), 1, Assoc::Left, "|l, r, _| Ok(binary(l, r, BinOp::Add))")
-                    .infix(r.sequence((r.parse("ws"), r.lit("*"))), 2, Assoc::Left, "|l, r, _| Ok(binary(l, r, BinOp::Mul))")
+                    .infix(r.sequence((r.parse("ws"), r.lit("+"))), 1, Assoc::Left, quote!(|l, r, _| Ok(binary(l, r, BinOp::Add))))
+                    .infix(r.sequence((r.parse("ws"), r.lit("*"))), 2, Assoc::Left, quote!(|l, r, _| Ok(binary(l, r, BinOp::Mul))))
             })
         })
         // Operand wraps primary with whitespace
         .rule("operand", |r| {
             r.sequence((r.parse("ws"), r.parse("primary"), r.parse("ws")))
-                .ast("|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(1)) } else { Ok(r) } }")
+                .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(1)) } else { Ok(r) } }))
         })
         .rule("primary", |r| {
             r.choice((
@@ -44,7 +45,7 @@ pub fn grammar() -> CompiledGrammar {
                 r.parse("ws"),
                 r.lit(")"),
             ))
-            .ast("|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(2)) } else { Ok(r) } }")
+            .ast(quote!(|r, _| { if let ParseResult::List(mut items) = r { Ok(items.remove(2)) } else { Ok(r) } }))
         })
         .rule("identifier", |r| {
             r.capture(r.sequence((
