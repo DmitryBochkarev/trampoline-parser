@@ -9,6 +9,8 @@ hashbrown = "0.15"
 
 [build-dependencies]
 trampoline-parser = { path = "../trampoline-parser" }
+quote = "1"
 
 [dev-dependencies]
 trampoline-parser = { path = "../trampoline-parser" }
+quote = "1"

@@ -9,5 +9,7 @@ categories = ["parser-implementations", "development-tools"]
 
 [dependencies]
 hashbrown = "0.15"
+quote = "1"
+proc-macro2 = "1"
 
 [dev-dependencies]
